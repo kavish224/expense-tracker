@@ -8,13 +8,15 @@ interface DashboardCardProps {
 
 export default function DashboardCard({ title, children, className = '' }: DashboardCardProps) {
     return (
-        <div
-            className={`rounded-xl border border-gray-200 dark:border-gray-800/60 bg-white dark:bg-[#1e2235] p-4 shadow-sm ${className}`}
-        >
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                {title}
-            </h3>
-            {children}
+        <div className={`kavish-card ${className}`}>
+            <div className="border-b border-[var(--color-border2)] px-4 py-3">
+                <h3 className="text-[14px] font-semibold text-[var(--color-text-primary)]">
+                    {title}
+                </h3>
+            </div>
+            <div className="p-4">
+                {children}
+            </div>
         </div>
     );
 }

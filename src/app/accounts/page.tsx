@@ -1,132 +1,112 @@
 'use client';
 
-import { useMemo } from 'react';
 import { useExpenseStore } from '@/store/useExpenseStore';
-import { getAccountTotals, getPaymentMethodTotals, formatCurrency } from '@/lib/calculations';
 import DashboardCard from '@/components/DashboardCard';
+import {
+    getAccountTotals,
+    getPaymentMethodTotals,
+    formatCurrency,
+} from '@/lib/calculations';
+import { useMemo } from 'react';
 
-const PM_ICONS: Record<string, string> = {
-    Cash: '💵',
-    UPI: '📱',
-    'Credit Card': '💳',
-    'Debit Card': '🏧',
-    'Net Banking': '🏦',
-    Wallet: '👝',
-};
-
-export default function AccountsPage() {
-    const { expenses, isLoaded } = useExpenseStore();
-
-    const paymentMethodTotals = useMemo(
-        () => getPaymentMethodTotals(expenses),
-        [expenses]
-    );
-
-    const accountTotals = useMemo(
-        () => getAccountTotals(expenses),
-        [expenses]
-    );
+export default function Accounts() {
+    const expenses = useExpenseStore((s) => s.expenses);
 
     const totalSpend = useMemo(
         () => expenses.reduce((sum, e) => sum + e.amount, 0),
         [expenses]
     );
 
-    if (!isLoaded) {
-        return (
-            <div className="flex h-64 items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-            </div>
-        );
-    }
+    const paymentMethodData = useMemo(() => getPaymentMethodTotals(expenses), [expenses]);
+    const accountBreakdown = useMemo(() => getAccountTotals(expenses), [expenses]);
+
+    // Max value for progress bars
+    const maxMethodValue = useMemo(() =>
+        Math.max(...paymentMethodData.map(d => d.value), 1),
+        [paymentMethodData]
+    );
 
     return (
-        <div className="space-y-4 pb-4">
-            {/* Total lifetime spend */}
-            <DashboardCard title="Total Lifetime Spend">
-                <p className="text-3xl font-bold tracking-tight text-gray-800 dark:text-white">
-                    {formatCurrency(totalSpend)}
+        <main className="mx-auto max-w-lg px-4 py-6 space-y-6">
+            <div className="kavish-card p-6 bg-gradient-to-br from-[var(--color-surface)] to-[var(--color-bg)]">
+                <p className="text-[12px] uppercase tracking-wider text-[var(--color-text-secondary)] font-medium mb-1">
+                    Total Lifetime Spend
                 </p>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    {expenses.length} expense{expenses.length !== 1 ? 's' : ''} recorded
-                </p>
+                <div className="flex items-baseline gap-2">
+                    <h2 className="text-[32px] font-bold text-[var(--color-text-primary)] tracking-tight">
+                        {formatCurrency(totalSpend)}
+                    </h2>
+                    <span className="text-[14px] text-[var(--color-text-secondary)] mb-1">
+                        ({expenses.length} transactions)
+                    </span>
+                </div>
+            </div>
+
+            <DashboardCard title="Funds Breakdown (This Month)">
+                <div className="space-y-4">
+                    {paymentMethodData.length > 0 ? (
+                        paymentMethodData.map((item) => (
+                            <div key={item.name} className="space-y-1.5">
+                                <div className="flex justify-between text-[13px]">
+                                    <span className="font-medium text-[var(--color-text-primary)]">{item.name}</span>
+                                    <span className="font-semibold text-[color:var(--color-accent)]">{formatCurrency(item.value)}</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-[var(--color-surface2)] rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-[var(--color-accent)] rounded-full transition-all duration-500"
+                                        style={{ width: `${(item.value / maxMethodValue) * 100}%` }}
+                                    />
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <p className="text-center py-4 text-[var(--color-text-secondary)] text-[13px]">
+                            No transactions to display
+                        </p>
+                    )}
+                </div>
             </DashboardCard>
 
-            {/* Payment methods */}
-            <DashboardCard title="By Payment Method (This Month)">
-                {paymentMethodTotals.length === 0 ? (
-                    <p className="py-4 text-center text-sm text-gray-500">
-                        No expenses this month
-                    </p>
-                ) : (
-                    <div className="space-y-3">
-                        {paymentMethodTotals.map((pm) => {
-                            const percent =
-                                paymentMethodTotals.reduce((s, p) => s + p.value, 0) > 0
-                                    ? (pm.value /
-                                        paymentMethodTotals.reduce(
-                                            (s, p) => s + p.value,
-                                            0
-                                        )) *
-                                    100
-                                    : 0;
-                            return (
-                                <div key={pm.name}>
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-lg">
-                                                {PM_ICONS[pm.name] || '💰'}
-                                            </span>
-                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                                                {pm.name}
-                                            </span>
-                                        </div>
-                                        <span className="text-sm font-semibold text-gray-800 dark:text-white">
-                                            {formatCurrency(pm.value)}
-                                        </span>
+            <DashboardCard title="Positions (By Account)" className="!p-0 overflow-hidden">
+                {accountBreakdown.length > 0 ? (
+                    <div>
+                        {accountBreakdown.map((account, idx) => (
+                            <div key={`${account.paymentMethod}-${account.account}-${idx}`} className="kavish-row hover:bg-[var(--color-surface2)]">
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                        <span className="font-semibold text-[13px]">{account.paymentMethod}</span>
+                                        <span className="text-[11px] text-[var(--color-text-secondary)]">({account.account})</span>
                                     </div>
-                                    <div className="h-1.5 w-full rounded-full bg-gray-200 dark:bg-gray-700/50 overflow-hidden">
-                                        <div
-                                            className="h-full rounded-full bg-blue-500 transition-all duration-500"
-                                            style={{ width: `${percent}%` }}
-                                        />
+                                    <div className="text-[11px] text-[var(--color-text-secondary)]">All-time utilization</div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="font-bold text-[13px] text-[var(--color-text-primary)]">
+                                        {formatCurrency(account.total)}
                                     </div>
                                 </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </DashboardCard>
-
-            {/* Account breakdown */}
-            <DashboardCard title="Account Breakdown (All Time)">
-                {accountTotals.length === 0 ? (
-                    <p className="py-4 text-center text-sm text-gray-500">
-                        No expenses recorded
-                    </p>
-                ) : (
-                    <div className="space-y-2">
-                        {accountTotals.map((acc, i) => (
-                            <div
-                                key={i}
-                                className="flex items-center justify-between rounded-lg bg-gray-50 dark:bg-gray-800/40 px-3 py-2.5"
-                            >
-                                <div>
-                                    <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                                        {acc.paymentMethod}
-                                    </p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                                        {acc.account}
-                                    </p>
-                                </div>
-                                <p className="text-sm font-semibold text-gray-800 dark:text-white">
-                                    {formatCurrency(acc.total)}
-                                </p>
                             </div>
                         ))}
                     </div>
+                ) : (
+                    <p className="text-center py-8 text-[var(--color-text-secondary)] text-[13px]">
+                        No account data available
+                    </p>
                 )}
             </DashboardCard>
-        </div>
+
+            {/* kavish style info card */}
+            <div className="p-4 rounded bg-[var(--color-surface2)] flex gap-3 border border-[var(--color-border2)]">
+                <div className="text-[color:var(--color-accent)] mt-0.5">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="16" x2="12" y2="12" />
+                        <line x1="12" y1="8" x2="12.01" y2="8" />
+                    </svg>
+                </div>
+                <p className="text-[12px] leading-relaxed text-[var(--color-text-secondary)]">
+                    Your ledger is stored locally on this device. Clearing your browser data will permanently delete your expense history unless exported.
+                </p>
+            </div>
+        </main>
     );
 }

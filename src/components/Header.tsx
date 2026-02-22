@@ -6,23 +6,22 @@ export default function Header() {
     const { theme, toggleTheme } = useTheme();
 
     return (
-        <header className="sticky top-0 z-30 border-b border-gray-200 dark:border-gray-800/50 bg-white/80 dark:bg-[#131722]/90 backdrop-blur-xl safe-area-top">
+        <header className="sticky top-0 z-30 border-b border-[var(--color-nav-border)] bg-[var(--color-nav-bg)] safe-area-top shadow-sm">
             <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3">
-                <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 shadow-md shadow-blue-600/20">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="12" y1="1" x2="12" y2="23" />
-                            <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+                <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded bg-[#ff5722]">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                         </svg>
                     </div>
-                    <h1 className="text-base font-bold text-gray-800 dark:text-white tracking-tight">
-                        Expense Tracker
+                    <h1 className="text-[15px] font-semibold text-[var(--color-text-primary)] tracking-tight">
+                        Kavish<span className="font-normal text-[var(--color-text-secondary)]"></span>
                     </h1>
                 </div>
 
                 <button
                     onClick={toggleTheme}
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800/60 text-gray-600 dark:text-gray-300 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700/60"
+                    className="flex h-8 w-8 items-center justify-center rounded hover:bg-[var(--color-surface2)] text-[var(--color-text-secondary)] transition-colors"
                     aria-label="Toggle theme"
                 >
                     {theme === 'dark' ? (

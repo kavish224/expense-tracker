@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
 import { useExpenseStore } from '@/store/useExpenseStore';
+import DashboardCard from '@/components/DashboardCard';
 import {
   getMonthlyTotal,
   getTodayTotal,
@@ -10,231 +10,184 @@ import {
   formatCurrency,
 } from '@/lib/calculations';
 import { CATEGORY_COLORS } from '@/lib/types';
-import DashboardCard from '@/components/DashboardCard';
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-} from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { useMemo } from 'react';
 
-const PM_COLORS = ['#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#6366F1'];
-
-export default function DashboardPage() {
-  const { expenses, isLoaded, deleteExpense } = useExpenseStore();
+export default function Dashboard() {
+  const expenses = useExpenseStore((s) => s.expenses);
+  const deleteExpense = useExpenseStore((s) => s.deleteExpense);
 
   const monthlyTotal = useMemo(() => getMonthlyTotal(expenses), [expenses]);
   const todayTotal = useMemo(() => getTodayTotal(expenses), [expenses]);
-  const categoryTotals = useMemo(() => getCategoryTotals(expenses), [expenses]);
-  const paymentMethodTotals = useMemo(
-    () => getPaymentMethodTotals(expenses),
+  const categoryData = useMemo(() => getCategoryTotals(expenses), [expenses]);
+  const paymentMethodData = useMemo(() => getPaymentMethodTotals(expenses), [expenses]);
+
+  const recentExpenses = useMemo(() =>
+    [...expenses]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 10),
     [expenses]
   );
-
-  const recentExpenses = useMemo(
-    () => expenses.slice(0, 10),
-    [expenses]
-  );
-
-  if (!isLoaded) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-4 pb-4">
-      {/* Top stats */}
-      <div className="grid grid-cols-2 gap-3">
-        <DashboardCard title="This Month">
-          <p className="text-2xl font-bold tracking-tight text-gray-800 dark:text-white">
+    <main className="mx-auto max-w-lg px-4 py-6 space-y-6">
+      {/* kavish Style Key Stats */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="kavish-card p-4">
+          <p className="text-[12px] uppercase tracking-wider text-[var(--color-text-secondary)] font-medium mb-1">
+            this month
+          </p>
+          <p className="text-[22px] font-semibold text-[var(--color-text-primary)]">
             {formatCurrency(monthlyTotal)}
           </p>
-        </DashboardCard>
-        <DashboardCard title="Today">
-          <p className="text-2xl font-bold tracking-tight text-gray-800 dark:text-white">
+        </div>
+        <div className="kavish-card p-4">
+          <p className="text-[12px] uppercase tracking-wider text-[var(--color-text-secondary)] font-medium mb-1">
+            today's spend
+          </p>
+          <p className="text-[22px] font-semibold text-[var(--color-text-primary)]">
             {formatCurrency(todayTotal)}
           </p>
+        </div>
+      </div>
+
+      {/* Breakdown Charts */}
+      <div className="grid grid-cols-1 gap-6">
+        <DashboardCard title="By Category">
+          <div className="h-48 w-full">
+            {categoryData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={categoryData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {categoryData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={CATEGORY_COLORS[entry.name as keyof typeof CATEGORY_COLORS] || '#ff5722'}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: number | undefined) => formatCurrency(value ?? 0)}
+                    contentStyle={{
+                      backgroundColor: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                    }}
+                    itemStyle={{ color: 'var(--color-text-primary)' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-[var(--color-text-secondary)]">
+                No categorical data
+              </div>
+            )}
+          </div>
+        </DashboardCard>
+
+        <DashboardCard title="Funds (By Method)">
+          <div className="h-48 w-full">
+            {paymentMethodData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={paymentMethodData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {paymentMethodData.map((_, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={['#ff5722', '#e05d4b', '#cc4a38', '#ff8a65'][index % 4]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: number | undefined) => formatCurrency(value ?? 0)}
+                    contentStyle={{
+                      backgroundColor: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                    }}
+                    itemStyle={{ color: 'var(--color-text-primary)' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-[var(--color-text-secondary)]">
+                No payment data
+              </div>
+            )}
+          </div>
         </DashboardCard>
       </div>
 
-      {/* Category breakdown donut */}
-      {categoryTotals.length > 0 && (
-        <DashboardCard title="By Category">
-          <div className="flex items-center gap-4">
-            <div className="h-40 w-40 flex-shrink-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={categoryTotals}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={35}
-                    outerRadius={65}
-                    paddingAngle={2}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                    {categoryTotals.map((entry) => (
-                      <Cell
-                        key={entry.name}
-                        fill={CATEGORY_COLORS[entry.name] || '#AEB6BF'}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: number | undefined) => formatCurrency(value ?? 0)}
-                    contentStyle={{
-                      backgroundColor: '#1e2235',
-                      border: '1px solid #374151',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex flex-col gap-1.5 text-xs min-w-0">
-              {categoryTotals.slice(0, 5).map((cat) => (
-                <div key={cat.name} className="flex items-center gap-2">
-                  <span
-                    className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
-                    style={{
-                      backgroundColor:
-                        CATEGORY_COLORS[cat.name] || '#AEB6BF',
-                    }}
-                  />
-                  <span className="truncate text-gray-600 dark:text-gray-300">
-                    {cat.name}
-                  </span>
-                  <span className="ml-auto font-medium text-gray-800 dark:text-white whitespace-nowrap">
-                    {formatCurrency(cat.value)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </DashboardCard>
-      )}
-
-      {/* Payment method donut */}
-      {paymentMethodTotals.length > 0 && (
-        <DashboardCard title="By Payment Method">
-          <div className="flex items-center gap-4">
-            <div className="h-40 w-40 flex-shrink-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={paymentMethodTotals}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={35}
-                    outerRadius={65}
-                    paddingAngle={2}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                    {paymentMethodTotals.map((_, index) => (
-                      <Cell
-                        key={index}
-                        fill={PM_COLORS[index % PM_COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: number | undefined) => formatCurrency(value ?? 0)}
-                    contentStyle={{
-                      backgroundColor: '#1e2235',
-                      border: '1px solid #374151',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex flex-col gap-1.5 text-xs min-w-0">
-              {paymentMethodTotals.map((pm, index) => (
-                <div key={pm.name} className="flex items-center gap-2">
-                  <span
-                    className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
-                    style={{
-                      backgroundColor: PM_COLORS[index % PM_COLORS.length],
-                    }}
-                  />
-                  <span className="truncate text-gray-600 dark:text-gray-300">
-                    {pm.name}
-                  </span>
-                  <span className="ml-auto font-medium text-gray-800 dark:text-white whitespace-nowrap">
-                    {formatCurrency(pm.value)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </DashboardCard>
-      )}
-
-      {/* Recent expenses */}
-      <DashboardCard title="Recent Expenses">
-        {recentExpenses.length === 0 ? (
-          <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-500">
-            No expenses yet. Tap + to add one!
-          </p>
-        ) : (
-          <div className="space-y-0.5">
+      {/* Recent Activity (kavish Marketwatch/Holdings Style) */}
+      <DashboardCard title="Recent Activity" className="!p-0 overflow-hidden">
+        {recentExpenses.length > 0 ? (
+          <div>
             {recentExpenses.map((expense) => (
-              <div
-                key={expense.id}
-                className="group flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/40"
-              >
-                <div
-                  className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
-                  style={{
-                    backgroundColor:
-                      CATEGORY_COLORS[expense.category] || '#AEB6BF',
-                  }}
-                >
-                  {expense.category.charAt(0)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
-                    {expense.category}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                    {expense.paymentMethod}
-                    {expense.note && ` · ${expense.note}`}
-                  </p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-sm font-semibold text-gray-800 dark:text-white">
-                    {formatCurrency(expense.amount)}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-500">
+              <div key={expense.id} className="kavish-row group">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="font-semibold text-[13px]">{expense.category}</span>
+                    <span className="text-[11px] px-1.5 py-0.5 bg-[var(--color-surface2)] text-[var(--color-text-secondary)] rounded-sm font-medium">
+                      {expense.paymentMethod}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-[var(--color-text-secondary)] capitalize">
                     {new Date(expense.date).toLocaleDateString('en-IN', {
-                      day: 'numeric',
+                      day: '2-digit',
                       month: 'short',
-                    })}
-                  </p>
+                      year: 'numeric'
+                    })} • {expense.note || 'No note'}
+                  </div>
                 </div>
-                <button
-                  onClick={() => deleteExpense(expense.id)}
-                  className="ml-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-400"
-                  aria-label="Delete expense"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-                  </svg>
-                </button>
+                <div className="flex items-center gap-4">
+                  <span className={`font-semibold text-[13px] ${expense.amount > 1000 ? 'kavish-red' : 'kavish-green'}`}>
+                    ₹{expense.amount.toLocaleString('en-IN')}
+                  </span>
+                  <button
+                    onClick={() => deleteExpense(expense.id)}
+                    className="opacity-0 group-hover:opacity-100 h-6 w-6 flex items-center justify-center text-[var(--color-text-secondary)] hover:text-red-500 transition-opacity"
+                    aria-label="Delete"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             ))}
           </div>
+        ) : (
+          <div className="py-12 flex flex-col items-center justify-center gap-3">
+            <div className="h-12 w-12 rounded-full bg-[var(--color-surface2)] flex items-center justify-center text-[var(--color-text-muted)]">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <p className="text-[var(--color-text-secondary)] text-[13px]">No expenses recorded yet.</p>
+          </div>
         )}
       </DashboardCard>
-    </div>
+    </main>
   );
 }

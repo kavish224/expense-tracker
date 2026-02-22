@@ -2,12 +2,57 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ── Zerodha kavish Design Tokens ─────────────────────────── */
 :root {
-  --font-inter: 'Inter', system-ui, -apple-system, sans-serif;
+  /* Light mode */
+  --color-bg: #f8f8f8;
+  --color-surface: #ffffff;
+  --color-surface2: #f1f3f6;
+  --color-border: #e0e0e0;
+  --color-border2: #eeeeee;
+
+  --color-text-primary: #444444;
+  --color-text-secondary: #999999;
+  --color-text-muted: #bbb;
+
+  --color-accent: #e05d4b;
+  /* kavish orange-red */
+  --color-accent-hover: #cc4a38;
+
+  --color-green: #4caf50;
+  --color-red: #df514c;
+
+  --color-nav-bg: #ffffff;
+  --color-nav-border: #e8e8e8;
+
+  --font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+.dark {
+  --color-bg: #151515;
+  --color-surface: #1b1b1b;
+  --color-surface2: #222222;
+  --color-border: #282828;
+  --color-border2: #212121;
+
+  --color-text-primary: #aaaaaa;
+  --color-text-secondary: #666666;
+  --color-text-muted: #444444;
+
+  --color-accent: #e05d4b;
+  --color-accent-hover: #cc4a38;
+
+  --color-green: #5b9a5d;
+  --color-red: #e25f5b;
+
+  --color-nav-bg: #1b1b1b;
+  --color-nav-border: #282828;
+}
+
+/* ── Base Styles ─────────────────────────────────────────── */
 * {
   -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
 }
 
 html {
@@ -16,11 +61,15 @@ html {
 }
 
 body {
-  font-family: var(--font-inter);
+  font-family: var(--font-family);
+  font-size: 13px;
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
   overscroll-behavior-y: none;
+  transition: background-color 0.2s, color 0.2s;
 }
 
-/* Safe area padding for iOS */
+/* ── iOS Safe Area ───────────────────────────────────────── */
 .safe-area-top {
   padding-top: env(safe-area-inset-top);
 }
@@ -33,44 +82,107 @@ body {
   padding-bottom: max(1rem, env(safe-area-inset-bottom));
 }
 
-/* Slide-up animation for bottom sheet */
-@keyframes slide-up {
+/* ── kavish-style bottom sheet animation ───────────────────── */
+@keyframes kavish-slide-up {
   from {
     transform: translateY(100%);
-    opacity: 0.5;
   }
+
   to {
     transform: translateY(0);
-    opacity: 1;
   }
 }
 
-.animate-slide-up {
-  animation: slide-up 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+.kavish-slide-up {
+  animation: kavish-slide-up 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Hide scrollbar but keep functionality */
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-
-/* Number input - hide spinner */
+/* ── Number inputs ───────────────────────────────────────── */
 input[type='number']::-webkit-inner-spin-button,
 input[type='number']::-webkit-outer-spin-button {
   -webkit-appearance: none;
+  appearance: none;
   margin: 0;
 }
 
 input[type='number'] {
   -moz-appearance: textfield;
+  appearance: textfield;
 }
 
-/* Recharts responsive container fix */
-.recharts-responsive-container {
-  min-height: 0 !important;
+/* ── kavish scrollbar ──────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 2px;
+}
+
+/* ── kavish chip / tag ─────────────────────────────────────── */
+.kavish-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.12s;
+  user-select: none;
+}
+
+.kavish-chip:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.kavish-chip.active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+
+/* ── kavish table-row expense item ─────────────────────────── */
+.kavish-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border2);
+  font-size: 13px;
+  transition: background 0.1s;
+  cursor: default;
+}
+
+.kavish-row:last-child {
+  border-bottom: none;
+}
+
+.kavish-row:hover {
+  background: var(--color-surface2);
+}
+
+/* ── kavish card ───────────────────────────────────────────── */
+.kavish-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+
+/* ── Number color helpers ────────────────────────────────── */
+.kavish-green {
+  color: var(--color-green);
+}
+
+.kavish-red {
+  color: var(--color-red);
 }

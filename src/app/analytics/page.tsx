@@ -1,17 +1,16 @@
 'use client';
 
-import { useMemo } from 'react';
 import { useExpenseStore } from '@/store/useExpenseStore';
+import DashboardCard from '@/components/DashboardCard';
 import {
-    getMonthlyTrend,
     getCategoryTotals,
+    getMonthlyTrend,
     getDailyAverage,
     getLargestExpense,
     getMonthOverMonthChange,
     formatCurrency,
 } from '@/lib/calculations';
 import { CATEGORY_COLORS } from '@/lib/types';
-import DashboardCard from '@/components/DashboardCard';
 import {
     LineChart,
     Line,
@@ -24,211 +23,147 @@ import {
     Tooltip,
     CartesianGrid,
 } from 'recharts';
+import { useMemo } from 'react';
 
-export default function AnalyticsPage() {
-    const { expenses, isLoaded } = useExpenseStore();
+export default function Analytics() {
+    const expenses = useExpenseStore((s) => s.expenses);
 
-    const monthlyTrend = useMemo(() => getMonthlyTrend(expenses, 6), [expenses]);
+    const monthlyTrend = useMemo(() => getMonthlyTrend(expenses), [expenses]);
     const categoryTotals = useMemo(() => getCategoryTotals(expenses), [expenses]);
-    const dailyAvg = useMemo(() => getDailyAverage(expenses), [expenses]);
-    const largest = useMemo(() => getLargestExpense(expenses), [expenses]);
-    const mom = useMemo(() => getMonthOverMonthChange(expenses), [expenses]);
-
-    if (!isLoaded) {
-        return (
-            <div className="flex h-64 items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-            </div>
-        );
-    }
+    const dailyAverage = useMemo(() => getDailyAverage(expenses), [expenses]);
+    const largestExpenseValue = useMemo(() => getLargestExpense(expenses), [expenses]);
+    const momChangeData = useMemo(() => getMonthOverMonthChange(expenses), [expenses]);
 
     return (
-        <div className="space-y-4 pb-4">
-            {/* Quick stats */}
-            <div className="grid grid-cols-2 gap-3">
-                <DashboardCard title="Daily Average">
-                    <p className="text-xl font-bold text-gray-800 dark:text-white">
-                        {formatCurrency(dailyAvg)}
+        <main className="mx-auto max-w-lg px-4 py-6 space-y-6">
+            {/* Analytics Stats */}
+            <div className="grid grid-cols-2 gap-4">
+                <div className="kavish-card p-4">
+                    <p className="text-[12px] uppercase tracking-wider text-[var(--color-text-secondary)] font-medium mb-1">
+                        Daily Avg
                     </p>
-                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                        This month
+                    <p className="text-[20px] font-semibold text-[var(--color-text-primary)]">
+                        {formatCurrency(dailyAverage)}
                     </p>
-                </DashboardCard>
-                <DashboardCard title="Month over Month">
-                    <p className="text-xl font-bold text-gray-800 dark:text-white">
-                        {mom.changePercent > 0 ? '+' : ''}
-                        {mom.changePercent.toFixed(1)}%
+                </div>
+                <div className="kavish-card p-4">
+                    <p className="text-[12px] uppercase tracking-wider text-[var(--color-text-secondary)] font-medium mb-1">
+                        MoM Change
                     </p>
-                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                        vs last month
+                    <p className={`text-[20px] font-semibold ${momChangeData.change >= 0 ? 'kavish-red' : 'kavish-green'}`}>
+                        {momChangeData.change > 0 ? '+' : ''}{momChangeData.change.toFixed(1)}%
                     </p>
-                </DashboardCard>
+                </div>
             </div>
 
-            {/* Largest expense */}
-            {largest && (
-                <DashboardCard title="Largest This Month">
-                    <div className="flex items-center gap-3">
-                        <div
-                            className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white"
-                            style={{
-                                backgroundColor:
-                                    CATEGORY_COLORS[largest.category] || '#AEB6BF',
-                            }}
-                        >
-                            {largest.category.charAt(0)}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <p className="font-semibold text-gray-800 dark:text-white">
-                                {formatCurrency(largest.amount)}
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                {largest.category}
-                                {largest.note && ` · ${largest.note}`}
-                            </p>
-                        </div>
-                    </div>
-                </DashboardCard>
-            )}
-
-            {/* Monthly trend */}
             <DashboardCard title="Monthly Trend">
-                {monthlyTrend.every((m) => m.total === 0) ? (
-                    <p className="py-8 text-center text-sm text-gray-500">
-                        No data yet
-                    </p>
-                ) : (
-                    <div className="h-48">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={monthlyTrend}>
-                                <CartesianGrid
-                                    strokeDasharray="3 3"
-                                    vertical={false}
-                                    stroke="#374151"
-                                    opacity={0.3}
-                                />
-                                <XAxis
-                                    dataKey="month"
-                                    tick={{ fontSize: 11, fill: '#9CA3AF' }}
-                                    axisLine={false}
-                                    tickLine={false}
-                                />
-                                <YAxis
-                                    tick={{ fontSize: 11, fill: '#9CA3AF' }}
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
-                                    width={45}
-                                />
-                                <Tooltip
-                                    formatter={(value: number | undefined) => formatCurrency(value ?? 0)}
-                                    contentStyle={{
-                                        backgroundColor: '#1e2235',
-                                        border: '1px solid #374151',
-                                        borderRadius: '8px',
-                                        fontSize: '12px',
-                                    }}
-                                    labelStyle={{ color: '#9CA3AF' }}
-                                />
-                                <Line
-                                    type="monotone"
-                                    dataKey="total"
-                                    stroke="#3B82F6"
-                                    strokeWidth={2.5}
-                                    dot={{ r: 4, fill: '#3B82F6' }}
-                                    activeDot={{ r: 6 }}
-                                />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </div>
-                )}
+                <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={monthlyTrend}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border2)" vertical={false} />
+                            <XAxis
+                                dataKey="month"
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
+                                dy={10}
+                            />
+                            <YAxis
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
+                                tickFormatter={(val) => `₹${val / 1000}k`}
+                                width={45}
+                            />
+                            <Tooltip
+                                formatter={(value: number | undefined) => formatCurrency(value ?? 0)}
+                                contentStyle={{
+                                    backgroundColor: 'var(--color-surface)',
+                                    border: '1px solid var(--color-border)',
+                                    borderRadius: '4px',
+                                    fontSize: '12px',
+                                }}
+                                itemStyle={{ color: 'var(--color-text-primary)' }}
+                            />
+                            <Line
+                                type="monotone"
+                                dataKey="total"
+                                stroke="#ff5722"
+                                strokeWidth={2.5}
+                                dot={{ fill: '#ff5722', r: 4, strokeWidth: 0 }}
+                                activeDot={{ r: 6, strokeWidth: 0 }}
+                            />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </div>
             </DashboardCard>
 
-            {/* Category bar chart */}
-            {categoryTotals.length > 0 && (
-                <DashboardCard title="Spending by Category">
-                    <div className="h-56">
+            <DashboardCard title="By Category">
+                <div className="h-64 w-full">
+                    {categoryTotals.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={categoryTotals} layout="vertical">
-                                <CartesianGrid
-                                    strokeDasharray="3 3"
-                                    horizontal={false}
-                                    stroke="#374151"
-                                    opacity={0.3}
-                                />
-                                <XAxis
-                                    type="number"
-                                    tick={{ fontSize: 11, fill: '#9CA3AF' }}
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
-                                />
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border2)" horizontal={false} />
+                                <XAxis type="number" hide />
                                 <YAxis
-                                    type="category"
                                     dataKey="name"
-                                    tick={{ fontSize: 11, fill: '#9CA3AF' }}
+                                    type="category"
                                     axisLine={false}
                                     tickLine={false}
+                                    tick={{ fill: 'var(--color-text-primary)', fontSize: 12 }}
                                     width={80}
                                 />
                                 <Tooltip
                                     formatter={(value: number | undefined) => formatCurrency(value ?? 0)}
                                     contentStyle={{
-                                        backgroundColor: '#1e2235',
-                                        border: '1px solid #374151',
-                                        borderRadius: '8px',
+                                        backgroundColor: 'var(--color-surface)',
+                                        border: '1px solid var(--color-border)',
+                                        borderRadius: '4px',
                                         fontSize: '12px',
                                     }}
+                                    itemStyle={{ color: 'var(--color-text-primary)' }}
                                 />
                                 <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20}>
-                                    {categoryTotals.map((entry) => (
+                                    {categoryTotals.map((entry, index) => (
                                         <Cell
-                                            key={entry.name}
-                                            fill={CATEGORY_COLORS[entry.name] || '#AEB6BF'}
+                                            key={`cell-${index}`}
+                                            fill={CATEGORY_COLORS[entry.name as keyof typeof CATEGORY_COLORS] || '#ff5722'}
                                         />
                                     ))}
                                 </Bar>
                             </BarChart>
                         </ResponsiveContainer>
-                    </div>
-                </DashboardCard>
-            )}
-
-            {/* Comparison card */}
-            <DashboardCard title="Month Comparison">
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                            This Month
-                        </p>
-                        <p className="text-lg font-bold text-gray-800 dark:text-white">
-                            {formatCurrency(mom.current)}
-                        </p>
-                    </div>
-                    <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Last Month
-                        </p>
-                        <p className="text-lg font-bold text-gray-800 dark:text-white">
-                            {formatCurrency(mom.previous)}
-                        </p>
-                    </div>
-                </div>
-                <div className="mt-3 h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700/50 overflow-hidden">
-                    <div
-                        className="h-full rounded-full bg-blue-500 transition-all duration-500"
-                        style={{
-                            width:
-                                mom.previous === 0
-                                    ? '100%'
-                                    : `${Math.min(
-                                        (mom.current / mom.previous) * 100,
-                                        100
-                                    )}%`,
-                        }}
-                    />
+                    ) : (
+                        <div className="h-full flex items-center justify-center text-[var(--color-text-secondary)] text-[13px]">
+                            Not enough data for allocation view
+                        </div>
+                    )}
                 </div>
             </DashboardCard>
-        </div>
+
+            {/* Largest Expense Highlight */}
+            {largestExpenseValue && (
+                <div className="kavish-card p-5 border-l-4 border-[var(--color-red)]">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <p className="text-[12px] uppercase tracking-wider text-[var(--color-text-secondary)] font-medium mb-1">
+                                Maximum Drawdown (Largest Expense)
+                            </p>
+                            <h4 className="text-[18px] font-semibold text-[var(--color-text-primary)] mb-1">
+                                {largestExpenseValue.category}
+                            </h4>
+                            <p className="text-[12px] text-[var(--color-text-secondary)]">
+                                {new Date(largestExpenseValue.date).toLocaleDateString()} • {largestExpenseValue.note || 'Regular expense'}
+                            </p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[20px] font-bold kavish-red">
+                                {formatCurrency(largestExpenseValue.amount)}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </main>
     );
 }
