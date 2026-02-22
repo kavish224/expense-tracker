@@ -14,6 +14,10 @@ export default function AddExpenseModal() {
     const inputRef = useRef<HTMLInputElement>(null);
     const backdropRef = useRef<HTMLDivElement>(null);
 
+    // Swipe down tracking
+    const [startY, setStartY] = useState<number | null>(null);
+    const [translateY, setTranslateY] = useState(0);
+
     // Filter accounts based on selected payment method
     const filteredAccounts = useMemo(() => {
         if (paymentMethod === 'UPI' || paymentMethod === 'Debit Card' || paymentMethod === 'Net Banking') {
@@ -61,6 +65,14 @@ export default function AddExpenseModal() {
         closeModal();
     }, [amount, category, paymentMethod, account, addExpense, closeModal]);
 
+    // Cleanup state forcefully when modal is forcefully closed externally
+    useEffect(() => {
+        if (!isModalOpen) {
+            setTranslateY(0);
+            setStartY(null);
+        }
+    }, [isModalOpen]);
+
     const handleBackdropClick = useCallback(
         (e: React.MouseEvent) => {
             if (e.target === backdropRef.current) {
@@ -80,22 +92,76 @@ export default function AddExpenseModal() {
         }
     }, [amount]);
 
+    // Swipe handlers
+    const handleTouchStart = (e: React.TouchEvent) => {
+        // Only track single touches
+        if (e.touches.length !== 1) return;
+        setStartY(e.touches[0].clientY);
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (startY === null) return;
+        const currentY = e.touches[0].clientY;
+        const delta = currentY - startY;
+
+        // Only allow swiping DOWN
+        if (delta > 0) {
+            setTranslateY(delta);
+        }
+    };
+
+    const handleTouchEnd = () => {
+        if (translateY > 150) {
+            // Threshold reached, close modal
+            closeModal();
+        } else {
+            // Snap back
+            setTranslateY(0);
+        }
+        setStartY(null);
+    };
+
     if (!isModalOpen) return null;
 
     return (
         <div
             ref={backdropRef}
             onClick={handleBackdropClick}
-            className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm transition-opacity"
+            style={{ opacity: translateY > 0 ? 1 - translateY / 500 : 1 }}
         >
-            <div className="w-full max-w-lg kavish-slide-up rounded-t-3xl bg-[var(--color-surface)] shadow-[0_-10px_40px_rgba(0,0,0,0.15)] flex flex-col max-h-[85vh]">
-                {/* Premium Sheet Handle */}
-                <div className="w-full flex justify-center pt-3 pb-1 bg-[var(--color-bg)] rounded-t-3xl">
+            <div
+                className="w-full max-w-lg kavish-slide-up rounded-t-3xl bg-[var(--color-surface)] shadow-[0_-10px_40px_rgba(0,0,0,0.15)] flex flex-col max-h-[85vh] transition-transform"
+                style={{
+                    transform: `translateY(${translateY}px)`,
+                    transition: startY === null ? 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)' : 'none'
+                }}
+            >
+                {/* Premium Sheet Handle - Swipable Area */}
+                <div
+                    className="w-full flex justify-center pt-3 pb-1 bg-[var(--color-bg)] rounded-t-3xl touch-none cursor-grab active:cursor-grabbing"
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    onMouseDown={(e: any) => handleTouchStart({ touches: [{ clientY: e.clientY }] } as any)}
+                    onMouseMove={(e: any) => startY !== null && handleTouchMove({ touches: [{ clientY: e.clientY }] } as any)}
+                    onMouseUp={handleTouchEnd}
+                    onMouseLeave={handleTouchEnd}
+                >
                     <div className="w-12 h-1.5 bg-[var(--color-border)] rounded-full"></div>
                 </div>
 
-                {/* Header */}
-                <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--color-border2)] bg-[var(--color-bg)]">
+                {/* Header - Swipable Area */}
+                <div
+                    className="flex items-center justify-between px-5 py-3 border-b border-[var(--color-border2)] bg-[var(--color-bg)] touch-none cursor-grab active:cursor-grabbing"
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    onMouseDown={(e: any) => handleTouchStart({ touches: [{ clientY: e.clientY }] } as any)}
+                    onMouseMove={(e: any) => startY !== null && handleTouchMove({ touches: [{ clientY: e.clientY }] } as any)}
+                    onMouseUp={handleTouchEnd}
+                    onMouseLeave={handleTouchEnd}
+                >
                     <div className="flex items-center gap-2">
                         <span className="text-[15px] font-bold text-[var(--color-text-primary)] tracking-tight">Add Expense</span>
                     </div>
