@@ -24,6 +24,8 @@ const nextConfig: NextConfig = {
       ? `v${process.env.npm_package_version}-${Date.now()}`
       : `v1.0.0-${Date.now()}`
   },
+  // Silence Next.js 16 Turbopack errors caused by next-pwa injecting webpack config
+  turbopack: {},
 };
 
 export default withPWA(nextConfig);
