@@ -86,25 +86,29 @@ export default function AddExpenseModal() {
         <div
             ref={backdropRef}
             onClick={handleBackdropClick}
-            className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-[2px]"
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm"
         >
-            <div className="w-full max-w-md kavish-slide-up rounded-t-lg bg-[var(--color-surface)] shadow-2xl pb-safe border-t border-[var(--color-border)]">
-                {/* kavish style order header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-border2)] bg-[var(--color-bg)] rounded-t-lg">
+            <div className="w-full max-w-lg kavish-slide-up rounded-t-3xl bg-[var(--color-surface)] shadow-[0_-10px_40px_rgba(0,0,0,0.15)] flex flex-col max-h-[85vh]">
+                {/* Premium Sheet Handle */}
+                <div className="w-full flex justify-center pt-3 pb-1 bg-[var(--color-bg)] rounded-t-3xl">
+                    <div className="w-12 h-1.5 bg-[var(--color-border)] rounded-full"></div>
+                </div>
+
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--color-border2)] bg-[var(--color-bg)]">
                     <div className="flex items-center gap-2">
-                        <span className="text-[14px] font-semibold text-[color:var(--color-accent)] uppercase">Add</span>
-                        <span className="text-[14px] font-semibold text-[var(--color-text-primary)]">New Expense</span>
+                        <span className="text-[15px] font-bold text-[var(--color-text-primary)] tracking-tight">Add Expense</span>
                     </div>
-                    <button onClick={closeModal} className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <button onClick={closeModal} className="h-8 w-8 bg-[var(--color-surface2)] rounded-full flex items-center justify-center text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] active:scale-95 transition-all">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                             <line x1="18" y1="6" x2="6" y2="18" />
                             <line x1="6" y1="6" x2="18" y2="18" />
                         </svg>
                     </button>
                 </div>
 
-                {/* Amount Input Section */}
-                <div className="p-5 space-y-5 overflow-y-auto max-h-[60vh]">
+                {/* Scrollable Form Content */}
+                <div className="flex-1 overflow-y-auto p-5 space-y-6">
                     <div>
                         <label className="text-[12px] text-[var(--color-text-secondary)] block mb-1.5 uppercase font-medium">Amount (INR)</label>
                         <div className="relative">

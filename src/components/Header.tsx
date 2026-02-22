@@ -14,12 +14,12 @@ export default function Header() {
         <header className="sticky top-0 z-30 border-b border-[var(--color-nav-border)] bg-[var(--color-nav-bg)] safe-area-top shadow-sm">
             <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3">
                 <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded bg-[#ff5722]">
+                    {/* <div className="flex h-8 w-8 items-center justify-center rounded bg-[#ff5722]">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                        </svg>
-                    </div>
-                    <h1 className="text-[15px] font-semibold text-[var(--color-text-primary)] tracking-tight">
+                        </svg> 
+                    </div> */}
+                    <h1 className="text-[20px] font-semibold text-[var(--color-text-primary)] tracking-tight">
                         Kavish<span className="font-normal text-[var(--color-text-secondary)]"></span>
                     </h1>
                 </div>

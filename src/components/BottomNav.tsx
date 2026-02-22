@@ -47,36 +47,45 @@ export default function BottomNav() {
     return (
         <>
             <div className="h-24" />
-            <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--color-nav-border)] bg-[var(--color-nav-bg)] shadow-[0_-1px_3px_rgba(0,0,0,0.05)] pb-[calc(env(safe-area-inset-bottom)+12px)] pt-1">
-                <div className="mx-auto flex max-w-lg items-center justify-around px-2">
+            <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--color-border)] bg-[var(--color-surface)] shadow-[0_-4px_20px_rgba(0,0,0,0.04)] pb-[calc(env(safe-area-inset-bottom)+8px)] pt-1">
+                <div className="mx-auto grid max-w-lg grid-cols-4 items-center">
+
+                    {/* The Original 3 Text Links */}
                     {navItems.map((item) => {
                         const active = pathname === item.href;
                         return (
                             <Link
                                 key={item.href}
                                 href={item.href}
-                                className={`flex flex-col items-center gap-1 py-3 px-4 transition-colors ${active
+                                className={`flex flex-col items-center justify-center gap-1.5 py-2.5 transition-all ${active
                                     ? 'text-[#ff5722]'
                                     : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
                                     }`}
                             >
-                                {item.icon(active)}
-                                <span className="text-[11px] font-medium uppercase tracking-wider">{item.label}</span>
+                                <div className={`transition-transform duration-200 ${active ? 'scale-110' : 'scale-100'}`}>
+                                    {item.icon(active)}
+                                </div>
+                                <span className={`text-[10px] uppercase tracking-wider transition-all duration-200 ${active ? 'font-bold' : 'font-medium'}`}>
+                                    {item.label}
+                                </span>
                             </Link>
                         );
                     })}
 
+                    {/* The Original Right-Side Add Button */}
                     <button
                         onClick={openModal}
-                        className="flex flex-col items-center gap-1 py-3 px-4 text-[var(--color-text-secondary)] hover:text-[#ff5722]"
+                        className="flex flex-col items-center justify-center py-2.5 group"
+                        aria-label="Add Expense"
                     >
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#ff5722] text-white shadow-lg shadow-[#ff5722]/20 active:scale-95 transition-transform">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[#ff5722] text-white shadow-md shadow-[#ff5722]/30 group-hover:bg-[#e05d4b] active:scale-90 transition-all duration-200 border border-[#ff5722]/10">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <line x1="12" y1="5" x2="12" y2="19" />
                                 <line x1="5" y1="12" x2="19" y2="12" />
                             </svg>
                         </div>
                     </button>
+
                 </div>
             </nav>
         </>
