@@ -25,6 +25,7 @@ import {
     CartesianGrid,
 } from 'recharts';
 import { useMemo } from 'react';
+import ExportCSVButton from '@/components/ExportCSVButton';
 
 export default function Analytics() {
     const { expenses, accounts } = useExpenseStore();
@@ -39,6 +40,11 @@ export default function Analytics() {
 
     return (
         <main className="mx-auto max-w-lg px-4 py-6 space-y-6">
+            <div className="flex items-center justify-between mb-2">
+                <h2 className="text-[18px] font-bold text-[var(--color-text-primary)]">Analytics</h2>
+                <ExportCSVButton />
+            </div>
+
             {/* Analytics Stats */}
             <div className="grid grid-cols-2 gap-4">
                 <div className="kavish-card p-4">

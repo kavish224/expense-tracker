@@ -6,6 +6,7 @@ import Header from "@/components/Header";
 import BottomNav from "@/components/BottomNav";
 import AddExpenseModal from "@/components/AddExpenseModal";
 import StoreInitializer from "@/components/StoreInitializer";
+import { ToastProvider } from "@/components/Toast";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -54,11 +55,13 @@ export default function RootLayout({
         className={`${inter.variable} font-sans antialiased bg-gray-50 dark:bg-[#131722] text-gray-900 dark:text-gray-100 min-h-screen`}
       >
         <ThemeProvider>
-          <StoreInitializer />
-          <Header />
-          <main className="mx-auto max-w-lg px-4 py-4">{children}</main>
-          <BottomNav />
-          <AddExpenseModal />
+          <ToastProvider>
+            <StoreInitializer />
+            <Header />
+            <main className="mx-auto max-w-lg px-4 py-4">{children}</main>
+            <BottomNav />
+            <AddExpenseModal />
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>
