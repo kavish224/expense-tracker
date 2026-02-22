@@ -92,7 +92,7 @@ export default function AddExpenseModal() {
                 {/* kavish style order header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-border2)] bg-[var(--color-bg)] rounded-t-lg">
                     <div className="flex items-center gap-2">
-                        <span className="text-[14px] font-semibold text-[color:var(--color-accent)] uppercase">Buy</span>
+                        <span className="text-[14px] font-semibold text-[color:var(--color-accent)] uppercase">Add</span>
                         <span className="text-[14px] font-semibold text-[var(--color-text-primary)]">New Expense</span>
                     </div>
                     <button onClick={closeModal} className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]">
@@ -181,7 +181,7 @@ export default function AddExpenseModal() {
 
                 {/* Footer with Numpad Toggle & Action Button */}
                 <div className="bg-[var(--color-bg)] border-t border-[var(--color-border2)] p-5 flex items-center justify-between">
-                    <span className="text-[12px] text-[var(--color-text-secondary)] italic">Local-first expense tracking</span>
+                    <span className="text-[12px] text-[var(--color-text-secondary)] italic"></span>
                     <div className="flex gap-3">
                         <button
                             onClick={closeModal}
@@ -194,20 +194,28 @@ export default function AddExpenseModal() {
                             disabled={!amount || parseFloat(amount) <= 0}
                             className="px-10 py-2.5 text-[14px] font-semibold text-white bg-[var(--color-accent)] hover:bg-[#cc4a38] rounded shadow-lg shadow-[#ff5722]/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                         >
-                            Buy
+                            Add
                         </button>
                     </div>
                 </div>
 
-                {/* Quick NumPad (kavish doesn't have this, but keeping it for UX efficiency) */}
-                <div className="grid grid-cols-4 gap-px bg-[var(--color-border2)]">
+                {/* Standard 3x4 NumPad */}
+                <div className="grid grid-cols-3 gap-px bg-[var(--color-border2)] pb-safe">
                     {['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'].map((key) => (
                         <button
                             key={key}
                             onClick={() => handleKeypadPress(key === '⌫' ? 'backspace' : key)}
-                            className="h-12 bg-[var(--color-surface)] text-[16px] font-medium text-[var(--color-text-primary)] active:bg-[var(--color-surface2)]"
+                            className="flex items-center justify-center h-16 bg-[var(--color-surface)] text-[22px] font-normal text-[var(--color-text-primary)] active:bg-[var(--color-surface2)] transition-colors"
                         >
-                            {key}
+                            {key === '⌫' ? (
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path>
+                                    <line x1="18" y1="9" x2="12" y2="15"></line>
+                                    <line x1="12" y1="9" x2="18" y2="15"></line>
+                                </svg>
+                            ) : (
+                                key
+                            )}
                         </button>
                     ))}
                 </div>

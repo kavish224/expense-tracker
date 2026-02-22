@@ -46,8 +46,8 @@ export default function BottomNav() {
 
     return (
         <>
-            <div className="h-16" />
-            <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--color-nav-border)] bg-[var(--color-nav-bg)] safe-area-bottom shadow-[0_-1px_3px_rgba(0,0,0,0.05)]">
+            <div className="h-24" />
+            <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--color-nav-border)] bg-[var(--color-nav-bg)] shadow-[0_-1px_3px_rgba(0,0,0,0.05)] pb-[calc(env(safe-area-inset-bottom)+12px)] pt-1">
                 <div className="mx-auto flex max-w-lg items-center justify-around px-2">
                     {navItems.map((item) => {
                         const active = pathname === item.href;
@@ -56,8 +56,8 @@ export default function BottomNav() {
                                 key={item.href}
                                 href={item.href}
                                 className={`flex flex-col items-center gap-1 py-3 px-4 transition-colors ${active
-                                        ? 'text-[#ff5722]'
-                                        : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                                    ? 'text-[#ff5722]'
+                                    : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
                                     }`}
                             >
                                 {item.icon(active)}
