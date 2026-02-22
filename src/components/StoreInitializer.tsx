@@ -45,13 +45,8 @@ export default function StoreInitializer() {
         }
     }, [isLoaded, loadExpenses, loadAccounts, user]);
 
-    // Register service worker
     useEffect(() => {
-        if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
-            navigator.serviceWorker.register('/sw.js').catch(() => {
-                // SW registration failed silently
-            });
-        }
+        console.log(`📱 App Version: ${process.env.NEXT_PUBLIC_APP_VERSION}`);
     }, []);
 
     return null;
