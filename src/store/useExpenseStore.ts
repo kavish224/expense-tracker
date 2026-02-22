@@ -1,7 +1,6 @@
 'use client';
 
 import { create } from 'zustand';
-import { v4 as uuidv4 } from 'uuid';
 import { Expense, Account } from '@/lib/types';
 import {
     addExpenseToDB,
@@ -12,11 +11,18 @@ import {
     deleteAccountFromDB
 } from '@/lib/db';
 
+interface User {
+    id: string;
+    email: string;
+}
+
 interface ExpenseStore {
     expenses: Expense[];
     accounts: Account[];
+    user: User | null;
     isLoaded: boolean;
     isModalOpen: boolean;
+    setUser: (user: User | null) => void;
     loadExpenses: () => Promise<void>;
     addExpense: (data: Omit<Expense, 'id'>) => Promise<void>;
     deleteExpense: (id: string) => Promise<void>;
@@ -30,8 +36,11 @@ interface ExpenseStore {
 export const useExpenseStore = create<ExpenseStore>((set, get) => ({
     expenses: [],
     accounts: [],
+    user: null,
     isLoaded: false,
     isModalOpen: false,
+
+    setUser: (user) => set({ user }),
 
     loadExpenses: async () => {
         try {
@@ -52,17 +61,14 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
     },
 
     addExpense: async (data) => {
-        const expense: Expense = {
-            ...data,
-            id: uuidv4(),
-        };
-        set({ expenses: [expense, ...get().expenses] });
-        await addExpenseToDB(expense);
+        // Wait for DB to return the expense so we get the real Postgres UUID + Date
+        const newExpense = await addExpenseToDB(data);
+        set({ expenses: [newExpense, ...get().expenses] });
     },
 
     deleteExpense: async (id) => {
-        set({ expenses: get().expenses.filter((e) => e.id !== id) });
         await deleteExpenseFromDB(id);
+        set({ expenses: get().expenses.filter((e) => e.id !== id) });
     },
 
     loadAccounts: async () => {
@@ -71,17 +77,13 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
     },
 
     addAccount: async (data) => {
-        const account: Account = {
-            ...data,
-            id: uuidv4(),
-        };
-        set({ accounts: [...get().accounts, account] });
-        await addAccountToDB(account);
+        const newAccount = await addAccountToDB(data);
+        set({ accounts: [...get().accounts, newAccount] });
     },
 
     deleteAccount: async (id) => {
-        set({ accounts: get().accounts.filter((a) => a.id !== id) });
         await deleteAccountFromDB(id);
+        set({ accounts: get().accounts.filter((a) => a.id !== id) });
     },
 
     openModal: () => set({ isModalOpen: true }),

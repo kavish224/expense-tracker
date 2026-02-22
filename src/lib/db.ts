@@ -1,80 +1,61 @@
-import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { Expense, Account } from './types';
 
-interface ExpenseDB extends DBSchema {
-    expenses: {
-        key: string;
-        value: Expense;
-        indexes: {
-            'by-date': string;
-            'by-category': string;
-        };
-    };
-    accounts: {
-        key: string;
-        value: Account;
-        indexes: {
-            'by-type': string;
-        };
-    };
-}
+// ================= Expenses =================
 
-const DB_NAME = 'expense-tracker-db';
-const DB_VERSION = 2;
-
-let dbPromise: Promise<IDBPDatabase<ExpenseDB>> | null = null;
-
-function getDB(): Promise<IDBPDatabase<ExpenseDB>> {
-    if (!dbPromise) {
-        dbPromise = openDB<ExpenseDB>(DB_NAME, DB_VERSION, {
-            upgrade(db, oldVersion) {
-                if (oldVersion < 1) {
-                    const store = db.createObjectStore('expenses', { keyPath: 'id' });
-                    store.createIndex('by-date', 'date');
-                    store.createIndex('by-category', 'category');
-                }
-                if (oldVersion < 2) {
-                    const accountStore = db.createObjectStore('accounts', { keyPath: 'id' });
-                    accountStore.createIndex('by-type', 'type');
-                }
-            },
-        });
-    }
-    return dbPromise;
-}
-
-export async function addExpenseToDB(expense: Expense): Promise<void> {
-    const db = await getDB();
-    await db.put('expenses', expense);
+export async function addExpenseToDB(expense: Omit<Expense, 'id'>): Promise<Expense> {
+    const res = await fetch('/api/expenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(expense),
+    });
+    if (!res.ok) throw new Error('Failed to add expense');
+    return res.json();
 }
 
 export async function getAllExpenses(): Promise<Expense[]> {
-    const db = await getDB();
-    return db.getAll('expenses');
+    const res = await fetch('/api/expenses');
+    if (!res.ok) throw new Error('Failed to fetch expenses');
+    return res.json();
 }
 
 export async function deleteExpenseFromDB(id: string): Promise<void> {
-    const db = await getDB();
-    await db.delete('expenses', id);
+    const res = await fetch(`/api/expenses/${id}`, {
+        method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete expense');
 }
 
-export async function getExpenseById(id: string): Promise<Expense | undefined> {
-    const db = await getDB();
-    return db.get('expenses', id);
+export async function updateExpenseInDB(id: string, expense: Partial<Expense>): Promise<Expense> {
+    const res = await fetch(`/api/expenses/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(expense),
+    });
+    if (!res.ok) throw new Error('Failed to update expense');
+    return res.json();
 }
 
-// Account CRUD
-export async function addAccountToDB(account: Account): Promise<void> {
-    const db = await getDB();
-    await db.put('accounts', account);
+// ================= Accounts =================
+
+export async function addAccountToDB(account: Omit<Account, 'id'>): Promise<Account> {
+    const res = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(account),
+    });
+    if (!res.ok) throw new Error('Failed to add account');
+    return res.json();
 }
 
 export async function getAllAccounts(): Promise<Account[]> {
-    const db = await getDB();
-    return db.getAll('accounts');
+    const res = await fetch('/api/accounts');
+    if (!res.ok) throw new Error('Failed to fetch accounts');
+    return res.json();
 }
 
 export async function deleteAccountFromDB(id: string): Promise<void> {
-    const db = await getDB();
-    await db.delete('accounts', id);
+    const res = await fetch(`/api/accounts/${id}`, {
+        method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete account');
 }
