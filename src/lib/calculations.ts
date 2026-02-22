@@ -138,17 +138,17 @@ export function getLargestExpense(
 export function getMonthOverMonthChange(expenses: Expense[]): {
     current: number;
     previous: number;
-    changePercent: number;
+    change: number;
 } {
     const now = new Date();
     const current = getMonthlyTotal(expenses, now);
     const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const previous = getMonthlyTotal(expenses, prev);
 
-    const changePercent =
+    const change =
         previous === 0 ? (current > 0 ? 100 : 0) : ((current - previous) / previous) * 100;
 
-    return { current, previous, changePercent };
+    return { current, previous, change };
 }
 
 export function getAccountTotals(
