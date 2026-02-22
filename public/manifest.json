@@ -4,8 +4,8 @@
   "description": "Personal expense tracker — local-first PWA",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0a",
-  "theme_color": "#2563eb",
+  "background_color": "#ffffff",
+  "theme_color": "#e05d4b",
   "orientation": "portrait",
   "icons": [
     {
