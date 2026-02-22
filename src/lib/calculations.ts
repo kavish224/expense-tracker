@@ -1,4 +1,4 @@
-import { Expense } from './types';
+import { Expense, Account } from './types';
 
 export function getMonthlyTotal(expenses: Expense[], date?: Date): number {
     const target = date || new Date();
@@ -171,6 +171,66 @@ export function getAccountTotals(
     });
 
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
+}
+
+export function getPaymentSourceTotals(
+    expenses: Expense[],
+    date?: Date
+): { name: string; value: number }[] {
+    const target = date || new Date();
+    const month = target.getMonth();
+    const year = target.getFullYear();
+
+    const filtered = expenses.filter((e) => {
+        const d = new Date(e.date);
+        return d.getMonth() === month && d.getFullYear() === year;
+    });
+
+    const map = new Map<string, number>();
+    filtered.forEach((e) => {
+        const source = e.account || e.paymentMethod;
+        map.set(source, (map.get(source) || 0) + e.amount);
+    });
+
+    return Array.from(map.entries())
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value);
+}
+
+export function getAccountSpendingByType(
+    expenses: Expense[],
+    accounts: Account[],
+    type: 'Bank' | 'CreditCard',
+    date?: Date
+): { name: string; value: number }[] {
+    const target = date || new Date();
+    const month = target.getMonth();
+    const year = target.getFullYear();
+
+    const filteredExpenses = expenses.filter((e) => {
+        const d = new Date(e.date);
+        return d.getMonth() === month && d.getFullYear() === year;
+    });
+
+    // Map account names of the specified type
+    const relevantAccountNames = new Set(
+        accounts.filter((a) => a.type === type).map((a) => a.name)
+    );
+
+    const map = new Map<string, number>();
+    filteredExpenses.forEach((e) => {
+        const isBankMethod = e.paymentMethod === 'UPI' || e.paymentMethod === 'Debit Card' || e.paymentMethod === 'Net Banking';
+        const isCCMethod = e.paymentMethod === 'Credit Card';
+        const matchesType = (type === 'Bank' && isBankMethod) || (type === 'CreditCard' && isCCMethod);
+
+        if (matchesType && e.account && relevantAccountNames.has(e.account)) {
+            map.set(e.account, (map.get(e.account) || 0) + e.amount);
+        }
+    });
+
+    return Array.from(map.entries())
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value);
 }
 
 export function formatCurrency(amount: number): string {

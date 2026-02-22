@@ -42,3 +42,9 @@ export const CATEGORY_COLORS: Record<string, string> = {
   Groceries: '#82E0AA',
   Other: '#AEB6BF',
 };
+
+export interface Account {
+  id: string;
+  name: string;
+  type: 'Bank' | 'CreditCard';
+}

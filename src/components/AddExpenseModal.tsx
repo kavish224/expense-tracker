@@ -1,27 +1,49 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useExpenseStore } from '@/store/useExpenseStore';
-import { CATEGORIES, PAYMENT_METHODS } from '@/lib/types';
+import { CATEGORIES, PAYMENT_METHODS, Account } from '@/lib/types';
 
 export default function AddExpenseModal() {
-    const { isModalOpen, closeModal, addExpense } = useExpenseStore();
+    const { isModalOpen, closeModal, addExpense, accounts } = useExpenseStore();
     const [amount, setAmount] = useState('');
     const [category, setCategory] = useState<string>(CATEGORIES[0]);
     const [paymentMethod, setPaymentMethod] = useState<string>(PAYMENT_METHODS[0]);
+    const [account, setAccount] = useState<string>('');
     const [note, setNote] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
     const backdropRef = useRef<HTMLDivElement>(null);
+
+    // Filter accounts based on selected payment method
+    const filteredAccounts = useMemo(() => {
+        if (paymentMethod === 'UPI' || paymentMethod === 'Debit Card' || paymentMethod === 'Net Banking') {
+            return accounts.filter(acc => acc.type === 'Bank');
+        }
+        if (paymentMethod === 'Credit Card') {
+            return accounts.filter(acc => acc.type === 'CreditCard');
+        }
+        return []; // No accounts for Cash, Wallet, etc.
+    }, [accounts, paymentMethod]);
 
     useEffect(() => {
         if (isModalOpen) {
             setAmount('');
             setCategory(CATEGORIES[0]);
             setPaymentMethod(PAYMENT_METHODS[0]);
+            setAccount('');
             setNote('');
             setTimeout(() => inputRef.current?.focus(), 100);
         }
     }, [isModalOpen]);
+
+    // Update account when payment method changes or accounts are loaded
+    useEffect(() => {
+        if (filteredAccounts.length > 0) {
+            setAccount(filteredAccounts[0].name);
+        } else {
+            setAccount('');
+        }
+    }, [filteredAccounts]);
 
     const handleSave = useCallback(async () => {
         const parsed = parseFloat(amount);
@@ -31,12 +53,13 @@ export default function AddExpenseModal() {
             amount: parsed,
             category,
             paymentMethod,
+            account: account || undefined,
             date: new Date().toISOString(),
             note: note.trim() || undefined,
         });
 
         closeModal();
-    }, [amount, category, paymentMethod, note, addExpense, closeModal]);
+    }, [amount, category, paymentMethod, account, addExpense, closeModal]);
 
     const handleBackdropClick = useCallback(
         (e: React.MouseEvent) => {
@@ -81,7 +104,7 @@ export default function AddExpenseModal() {
                 </div>
 
                 {/* Amount Input Section */}
-                <div className="p-5 space-y-5">
+                <div className="p-5 space-y-5 overflow-y-auto max-h-[60vh]">
                     <div>
                         <label className="text-[12px] text-[var(--color-text-secondary)] block mb-1.5 uppercase font-medium">Amount (INR)</label>
                         <div className="relative">
@@ -126,6 +149,23 @@ export default function AddExpenseModal() {
                             ))}
                         </div>
                     </div>
+
+                    {filteredAccounts.length > 0 && (
+                        <div>
+                            <label className="text-[12px] text-[var(--color-text-secondary)] block mb-2 uppercase font-medium">Select Account</label>
+                            <div className="flex flex-wrap gap-2">
+                                {filteredAccounts.map((acc) => (
+                                    <button
+                                        key={acc.id}
+                                        onClick={() => setAccount(acc.name)}
+                                        className={`kavish-chip ${account === acc.name ? 'active' : ''}`}
+                                    >
+                                        {acc.name}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     <div>
                         <label className="text-[12px] text-[var(--color-text-secondary)] block mb-1.5 uppercase font-medium">Note</label>

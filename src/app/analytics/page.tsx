@@ -8,6 +8,7 @@ import {
     getDailyAverage,
     getLargestExpense,
     getMonthOverMonthChange,
+    getAccountSpendingByType,
     formatCurrency,
 } from '@/lib/calculations';
 import { CATEGORY_COLORS } from '@/lib/types';
@@ -26,13 +27,15 @@ import {
 import { useMemo } from 'react';
 
 export default function Analytics() {
-    const expenses = useExpenseStore((s) => s.expenses);
+    const { expenses, accounts } = useExpenseStore();
 
     const monthlyTrend = useMemo(() => getMonthlyTrend(expenses), [expenses]);
     const categoryTotals = useMemo(() => getCategoryTotals(expenses), [expenses]);
     const dailyAverage = useMemo(() => getDailyAverage(expenses), [expenses]);
     const largestExpenseValue = useMemo(() => getLargestExpense(expenses), [expenses]);
     const momChangeData = useMemo(() => getMonthOverMonthChange(expenses), [expenses]);
+    const bankSpending = useMemo(() => getAccountSpendingByType(expenses, accounts, 'Bank'), [expenses, accounts]);
+    const creditCardSpending = useMemo(() => getAccountSpendingByType(expenses, accounts, 'CreditCard'), [expenses, accounts]);
 
     return (
         <main className="mx-auto max-w-lg px-4 py-6 space-y-6">
@@ -136,6 +139,80 @@ export default function Analytics() {
                     ) : (
                         <div className="h-full flex items-center justify-center text-[var(--color-text-secondary)] text-[13px]">
                             Not enough data for allocation view
+                        </div>
+                    )}
+                </div>
+            </DashboardCard>
+
+            {/* Per Bank Account Spend */}
+            <DashboardCard title="By Bank Account">
+                <div className="h-48 w-full">
+                    {bankSpending.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={bankSpending} layout="vertical">
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border2)" horizontal={false} />
+                                <XAxis type="number" hide />
+                                <YAxis
+                                    dataKey="name"
+                                    type="category"
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fill: 'var(--color-text-primary)', fontSize: 12 }}
+                                    width={100}
+                                />
+                                <Tooltip
+                                    formatter={(value: number | undefined) => formatCurrency(value ?? 0)}
+                                    contentStyle={{
+                                        backgroundColor: 'var(--color-surface)',
+                                        border: '1px solid var(--color-border)',
+                                        borderRadius: '4px',
+                                        fontSize: '12px',
+                                    }}
+                                    itemStyle={{ color: 'var(--color-text-primary)' }}
+                                />
+                                <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20} fill="#4caf50" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className="h-full flex items-center justify-center text-[var(--color-text-secondary)] text-[13px]">
+                            No bank account spending data
+                        </div>
+                    )}
+                </div>
+            </DashboardCard>
+
+            {/* Per Credit Card Spend */}
+            <DashboardCard title="By Credit Card">
+                <div className="h-48 w-full">
+                    {creditCardSpending.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={creditCardSpending} layout="vertical">
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border2)" horizontal={false} />
+                                <XAxis type="number" hide />
+                                <YAxis
+                                    dataKey="name"
+                                    type="category"
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fill: 'var(--color-text-primary)', fontSize: 12 }}
+                                    width={100}
+                                />
+                                <Tooltip
+                                    formatter={(value: number | undefined) => formatCurrency(value ?? 0)}
+                                    contentStyle={{
+                                        backgroundColor: 'var(--color-surface)',
+                                        border: '1px solid var(--color-border)',
+                                        borderRadius: '4px',
+                                        fontSize: '12px',
+                                    }}
+                                    itemStyle={{ color: 'var(--color-text-primary)' }}
+                                />
+                                <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20} fill="#2196f3" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className="h-full flex items-center justify-center text-[var(--color-text-secondary)] text-[13px]">
+                            No credit card spending data
                         </div>
                     )}
                 </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useMemo } from 'react';
 import { useExpenseStore } from '@/store/useExpenseStore';
 import DashboardCard from '@/components/DashboardCard';
 import {
@@ -7,10 +8,15 @@ import {
     getPaymentMethodTotals,
     formatCurrency,
 } from '@/lib/calculations';
-import { useMemo } from 'react';
+import { PAYMENT_METHODS } from '@/lib/types';
 
 export default function Accounts() {
-    const expenses = useExpenseStore((s) => s.expenses);
+    const { expenses, accounts, addAccount, deleteAccount } = useExpenseStore();
+
+    // Form state
+    const [newName, setNewName] = useState('');
+    const [newType, setNewType] = useState<'Bank' | 'CreditCard'>('Bank');
+    const [showAddForm, setShowAddForm] = useState(false);
 
     const totalSpend = useMemo(
         () => expenses.reduce((sum, e) => sum + e.amount, 0),
@@ -20,14 +26,26 @@ export default function Accounts() {
     const paymentMethodData = useMemo(() => getPaymentMethodTotals(expenses), [expenses]);
     const accountBreakdown = useMemo(() => getAccountTotals(expenses), [expenses]);
 
-    // Max value for progress bars
-    const maxMethodValue = useMemo(() =>
-        Math.max(...paymentMethodData.map(d => d.value), 1),
-        [paymentMethodData]
-    );
+    const handleAddAccount = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newName.trim()) return;
+
+        let finalName = newName.trim();
+        if (newType === 'CreditCard' && !finalName.toLowerCase().endsWith('cc')) {
+            finalName += ' (CC)';
+        }
+
+        await addAccount({
+            name: finalName,
+            type: newType
+        });
+
+        setNewName('');
+        setShowAddForm(false);
+    };
 
     return (
-        <main className="mx-auto max-w-lg px-4 py-6 space-y-6">
+        <main className="mx-auto max-w-lg px-4 py-6 space-y-6 mb-20">
             <div className="kavish-card p-6 bg-gradient-to-br from-[var(--color-surface)] to-[var(--color-bg)]">
                 <p className="text-[12px] uppercase tracking-wider text-[var(--color-text-secondary)] font-medium mb-1">
                     Total Lifetime Spend
@@ -42,27 +60,98 @@ export default function Accounts() {
                 </div>
             </div>
 
-            <DashboardCard title="Funds Breakdown (This Month)">
+            {/* Dynamic Account Management */}
+            <DashboardCard title="Manage Accounts & Cards">
                 <div className="space-y-4">
-                    {paymentMethodData.length > 0 ? (
-                        paymentMethodData.map((item) => (
-                            <div key={item.name} className="space-y-1.5">
-                                <div className="flex justify-between text-[13px]">
-                                    <span className="font-medium text-[var(--color-text-primary)]">{item.name}</span>
-                                    <span className="font-semibold text-[color:var(--color-accent)]">{formatCurrency(item.value)}</span>
+                    {accounts.length > 0 ? (
+                        <div className="space-y-2">
+                            {accounts.map((acc) => (
+                                <div key={acc.id} className="flex items-center justify-between p-3 rounded bg-[var(--color-bg)] border border-[var(--color-border2)]">
+                                    <div>
+                                        <p className="font-semibold text-[13px] text-[var(--color-text-primary)]">{acc.name}</p>
+                                        <p className="text-[11px] text-[var(--color-text-secondary)] uppercase tracking-wider">
+                                            {acc.type === 'Bank' ? 'Bank Account' : 'Credit Card'}
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => deleteAccount(acc.id)}
+                                        className="p-2 text-[var(--color-text-secondary)] hover:text-red-500 transition-colors"
+                                    >
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <polyline points="3 6 5 6 21 6" />
+                                            <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                                        </svg>
+                                    </button>
                                 </div>
-                                <div className="h-1.5 w-full bg-[var(--color-surface2)] rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full bg-[var(--color-accent)] rounded-full transition-all duration-500"
-                                        style={{ width: `${(item.value / maxMethodValue) * 100}%` }}
-                                    />
-                                </div>
-                            </div>
-                        ))
+                            ))}
+                        </div>
                     ) : (
                         <p className="text-center py-4 text-[var(--color-text-secondary)] text-[13px]">
-                            No transactions to display
+                            No custom accounts added yet.
                         </p>
+                    )}
+
+                    {!showAddForm ? (
+                        <button
+                            onClick={() => setShowAddForm(true)}
+                            className="w-full py-2.5 border-2 border-dashed border-[var(--color-border)] rounded text-[13px] font-medium text-[var(--color-text-secondary)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-all"
+                        >
+                            + Add New Account / Card
+                        </button>
+                    ) : (
+                        <form onSubmit={handleAddAccount} className="p-4 rounded bg-[var(--color-surface2)] border border-[var(--color-border)] space-y-4">
+                            <div>
+                                <label className="text-[11px] uppercase tracking-wider font-semibold text-[var(--color-text-secondary)] mb-1 block">Account Name</label>
+                                <input
+                                    type="text"
+                                    value={newName}
+                                    onChange={(e) => setNewName(e.target.value)}
+                                    placeholder="e.g. HDFC Bank, ICICI Credit Card"
+                                    className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded px-3 py-2 text-[13px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
+                                    autoFocus
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[11px] uppercase tracking-wider font-semibold text-[var(--color-text-secondary)] mb-1 block">Source Type</label>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setNewType('Bank')}
+                                        className={`flex-1 py-1.5 rounded text-[11px] font-medium border transition-all ${newType === 'Bank'
+                                            ? 'bg-[var(--color-accent)] border-[var(--color-accent)] text-white'
+                                            : 'bg-[var(--color-bg)] border-[var(--color-border)] text-[var(--color-text-secondary)]'
+                                            }`}
+                                    >
+                                        Bank Account
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setNewType('CreditCard')}
+                                        className={`flex-1 py-1.5 rounded text-[11px] font-medium border transition-all ${newType === 'CreditCard'
+                                            ? 'bg-[var(--color-accent)] border-[var(--color-accent)] text-white'
+                                            : 'bg-[var(--color-bg)] border-[var(--color-border)] text-[var(--color-text-secondary)]'
+                                            }`}
+                                    >
+                                        Credit Card
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAddForm(false)}
+                                    className="flex-1 py-2 text-[13px] font-medium bg-[var(--color-bg)] text-[var(--color-text-secondary)] rounded"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="flex-1 py-2 text-[13px] font-medium bg-[var(--color-accent)] text-white rounded"
+                                >
+                                    Add Account
+                                </button>
+                            </div>
+                        </form>
                     )}
                 </div>
             </DashboardCard>
@@ -104,7 +193,7 @@ export default function Accounts() {
                     </svg>
                 </div>
                 <p className="text-[12px] leading-relaxed text-[var(--color-text-secondary)]">
-                    Your ledger is stored locally on this device. Clearing your browser data will permanently delete your expense history unless exported.
+                    Your ledger and accounts are stored locally on this device. Clearing your browser data will permanently delete your expense history unless exported.
                 </p>
             </div>
         </main>
