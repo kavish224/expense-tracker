@@ -192,9 +192,6 @@ export default function Accounts() {
                         <line x1="12" y1="8" x2="12.01" y2="8" />
                     </svg>
                 </div>
-                <p className="text-[12px] leading-relaxed text-[var(--color-text-secondary)]">
-                    Your ledger and accounts are stored locally on this device. Clearing your browser data will permanently delete your expense history unless exported.
-                </p>
             </div>
         </main>
     );
