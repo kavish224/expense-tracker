@@ -66,21 +66,27 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
     },
 
     addExpense: async (data) => {
-        // Wait for DB to return the expense so we get the real Postgres UUID + Date
         const newExpense = await addExpenseToDB(data);
-        set({ expenses: [newExpense, ...get().expenses] });
+        set({
+            expenses: [newExpense, ...get().expenses].sort(
+                (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+            )
+        });
     },
 
     updateExpense: async (id, data) => {
         const updatedExpense = await updateExpenseInDB(id, data);
         set({
-            expenses: get().expenses.map((e) => (e.id === id ? updatedExpense : e)),
+            expenses: get().expenses.map((e) => (e.id === id ? updatedExpense : e)).sort(
+                (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+            ),
         });
     },
 
     deleteExpense: async (id) => {
         await deleteExpenseFromDB(id);
-        set({ expenses: get().expenses.filter((e) => e.id !== id) });
+        const filtered = get().expenses.filter((e) => e.id !== id);
+        set({ expenses: filtered });
     },
 
     loadAccounts: async () => {

@@ -7,7 +7,7 @@ import Calendar from './Calendar';
 import TimePicker from './TimePicker';
 
 export default function AddExpenseModal() {
-    const { isModalOpen, closeModal, addExpense, updateExpense, accounts, editingExpense } = useExpenseStore();
+    const { isModalOpen, closeModal, addExpense, updateExpense, deleteExpense, accounts, editingExpense } = useExpenseStore();
     const [amount, setAmount] = useState('');
     const [category, setCategory] = useState<string>(CATEGORIES[0]);
     const [paymentMethod, setPaymentMethod] = useState<string>(PAYMENT_METHODS[0]);
@@ -82,12 +82,14 @@ export default function AddExpenseModal() {
         };
 
         if (editingExpense) {
-            await updateExpense(editingExpense.id, expenseData);
+            if (window.confirm('Save changes to this expense?')) {
+                await updateExpense(editingExpense.id, expenseData);
+                closeModal();
+            }
         } else {
             await addExpense(expenseData);
+            closeModal();
         }
-
-        closeModal();
     }, [amount, category, paymentMethod, account, note, date, addExpense, updateExpense, editingExpense, closeModal]);
 
     // Cleanup state forcefully when modal is forcefully closed externally
@@ -349,6 +351,19 @@ export default function AddExpenseModal() {
                 <div className="bg-[var(--color-bg)] border-t border-[var(--color-border2)] p-5 flex items-center justify-between">
                     <span className="text-[12px] text-[var(--color-text-secondary)] italic"></span>
                     <div className="flex gap-3">
+                        {editingExpense && (
+                            <button
+                                onClick={async () => {
+                                    if (window.confirm('Permanently delete this expense?')) {
+                                        await deleteExpense(editingExpense.id);
+                                        closeModal();
+                                    }
+                                }}
+                                className="px-4 py-2.5 text-[14px] font-semibold text-[var(--color-red)] hover:bg-[var(--color-red)]/10 rounded transition-colors mr-auto"
+                            >
+                                Delete
+                            </button>
+                        )}
                         <button
                             onClick={closeModal}
                             className="px-6 py-2.5 text-[14px] font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface2)] rounded transition-colors"

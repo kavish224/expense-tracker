@@ -14,9 +14,17 @@ export function getMonthlyTotal(expenses: Expense[], date?: Date): number {
 
 export function getTodayTotal(expenses: Expense[]): number {
     const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
+    const todayDate = today.getDate();
+    const todayMonth = today.getMonth();
+    const todayYear = today.getFullYear();
+
     return expenses
-        .filter((e) => e.date.split('T')[0] === todayStr)
+        .filter((e) => {
+            const d = new Date(e.date);
+            return d.getDate() === todayDate &&
+                d.getMonth() === todayMonth &&
+                d.getFullYear() === todayYear;
+        })
         .reduce((sum, e) => sum + e.amount, 0);
 }
 
