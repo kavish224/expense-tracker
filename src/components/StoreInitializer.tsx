@@ -5,9 +5,9 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useExpenseStore } from '@/store/useExpenseStore';
 
 export default function StoreInitializer() {
-    const loadExpenses = useExpenseStore((s) => s.loadExpenses);
-    const loadAccounts = useExpenseStore((s) => s.loadAccounts);
-    const isLoaded = useExpenseStore((s) => s.isLoaded);
+    const initializeData = useExpenseStore((s) => s.initializeData);
+    const loading = useExpenseStore((s) => s.loading);
+    const expenses = useExpenseStore((s) => s.expenses);
     const setUser = useExpenseStore((s) => s.setUser);
     const user = useExpenseStore((s) => s.user);
 
@@ -39,11 +39,10 @@ export default function StoreInitializer() {
     }, [pathname, router, setUser]);
 
     useEffect(() => {
-        if (user && !isLoaded) {
-            loadExpenses();
-            loadAccounts();
+        if (user && !loading.initial && expenses.length === 0) {
+            initializeData();
         }
-    }, [isLoaded, loadExpenses, loadAccounts, user]);
+    }, [user, loading.initial, expenses.length, initializeData]);
 
     useEffect(() => {
         console.log(`📱 App Version: ${process.env.NEXT_PUBLIC_APP_VERSION}`);

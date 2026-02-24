@@ -19,12 +19,17 @@ const withPWA = withPWAInit({
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  poweredByHeader: false,
+  compress: true,
+  images: {
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 60,
+  },
   env: {
     NEXT_PUBLIC_APP_VERSION: process.env.npm_package_version
       ? `v${process.env.npm_package_version}-${Date.now()}`
       : `v1.0.0-${Date.now()}`
   },
-  // Silence Next.js 16 Turbopack errors caused by next-pwa injecting webpack config
   turbopack: {},
 };
 

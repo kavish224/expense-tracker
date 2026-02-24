@@ -61,7 +61,7 @@ export default function TimePicker({ value, onChange, className = '' }: TimePick
                         onClick={() => updateTime(h, currentMinutes, currentAmpm)}
                         className={`w-full py-3 rounded-lg text-[14px] font-semibold mb-1 transition-all active:scale-90 ${currentHours === h
                                 ? 'bg-[var(--color-accent)] text-white shadow-lg shadow-[var(--color-accent)]/20'
-                                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface2)]'
+                                : 'text-[var(--color-text-secondary)] active:bg-[var(--color-surface2)] touch-manipulation'
                             }`}
                     >
                         {h.toString().padStart(2, '0')}
@@ -78,7 +78,7 @@ export default function TimePicker({ value, onChange, className = '' }: TimePick
                         onClick={() => updateTime(currentHours, m, currentAmpm)}
                         className={`w-full py-3 rounded-lg text-[14px] font-semibold mb-1 transition-all active:scale-90 ${currentMinutes === m
                                 ? 'bg-[var(--color-accent)] text-white shadow-lg shadow-[var(--color-accent)]/20'
-                                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface2)]'
+                                : 'text-[var(--color-text-secondary)] active:bg-[var(--color-surface2)] touch-manipulation'
                             }`}
                     >
                         {m.toString().padStart(2, '0')}
@@ -94,7 +94,7 @@ export default function TimePicker({ value, onChange, className = '' }: TimePick
                         onClick={() => updateTime(currentHours, currentMinutes, ap)}
                         className={`w-full py-5 rounded-2xl text-[11px] font-black tracking-widest transition-all active:scale-95 ${currentAmpm === ap
                                 ? 'bg-[var(--color-accent)] text-white shadow-lg shadow-[var(--color-accent)]/20'
-                                : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface2)]'
+                                : 'text-[var(--color-text-muted)] active:bg-[var(--color-surface2)] touch-manipulation'
                             }`}
                     >
                         {ap}

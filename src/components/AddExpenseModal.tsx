@@ -19,9 +19,11 @@ export default function AddExpenseModal() {
     const inputRef = useRef<HTMLInputElement>(null);
     const backdropRef = useRef<HTMLDivElement>(null);
 
-    // Swipe down tracking
-    const [startY, setStartY] = useState<number | null>(null);
-    const [translateY, setTranslateY] = useState(0);
+    // Swipe down tracking with pointer events
+    const [dragStartY, setDragStartY] = useState<number | null>(null);
+    const [dragCurrentY, setDragCurrentY] = useState<number | null>(null);
+    const isDragging = useRef(false);
+    const translateY = dragCurrentY && dragStartY ? Math.max(0, dragCurrentY - dragStartY) : 0;
 
     // Filter accounts based on selected payment method
     const filteredAccounts = useMemo(() => {
@@ -95,8 +97,9 @@ export default function AddExpenseModal() {
     // Cleanup state forcefully when modal is forcefully closed externally
     useEffect(() => {
         if (!isModalOpen) {
-            setTranslateY(0);
-            setStartY(null);
+            setDragStartY(null);
+            setDragCurrentY(null);
+            isDragging.current = false;
         }
     }, [isModalOpen]);
 
@@ -119,33 +122,39 @@ export default function AddExpenseModal() {
         }
     }, [amount]);
 
-    // Swipe handlers
-    const handleTouchStart = (e: React.TouchEvent) => {
-        // Only track single touches
-        if (e.touches.length !== 1) return;
-        setStartY(e.touches[0].clientY);
+    // Pointer event handlers for swipe
+    const handlePointerDown = (e: React.PointerEvent) => {
+        if (e.pointerType === 'touch' || e.pointerType === 'mouse') {
+            setDragStartY(e.clientY);
+            setDragCurrentY(e.clientY);
+            isDragging.current = true;
+            e.currentTarget.setPointerCapture(e.pointerId);
+        }
     };
 
-    const handleTouchMove = (e: React.TouchEvent) => {
-        if (startY === null) return;
-        const currentY = e.touches[0].clientY;
-        const delta = currentY - startY;
+    const handlePointerMove = (e: React.PointerEvent) => {
+        if (!isDragging.current || !dragStartY) return;
+        const delta = e.clientY - dragStartY;
 
         // Only allow swiping DOWN
         if (delta > 0) {
-            setTranslateY(delta);
+            setDragCurrentY(e.clientY);
         }
     };
 
-    const handleTouchEnd = () => {
-        if (translateY > 150) {
+    const handlePointerUp = (e: React.PointerEvent) => {
+        if (!isDragging.current) return;
+        e.currentTarget.releasePointerCapture(e.pointerId);
+        isDragging.current = false;
+
+        const delta = dragCurrentY && dragStartY ? dragCurrentY - dragStartY : 0;
+        if (delta > 150) {
             // Threshold reached, close modal
             closeModal();
-        } else {
-            // Snap back
-            setTranslateY(0);
         }
-        setStartY(null);
+
+        setDragStartY(null);
+        setDragCurrentY(null);
     };
 
     if (!isModalOpen) return null;
@@ -161,19 +170,16 @@ export default function AddExpenseModal() {
                 className="w-full max-w-lg kavish-slide-up rounded-t-3xl bg-[var(--color-surface)] shadow-[0_-10px_40px_rgba(0,0,0,0.15)] flex flex-col max-h-[85vh] transition-transform"
                 style={{
                     transform: `translateY(${translateY}px)`,
-                    transition: startY === null ? 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)' : 'none'
+                    transition: dragStartY === null ? 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)' : 'none'
                 }}
             >
                 {/* Premium Sheet Handle - Swipable Area */}
                 <div
                     className="w-full flex justify-center pt-3 pb-1 bg-[var(--color-bg)] rounded-t-3xl touch-none cursor-grab active:cursor-grabbing"
-                    onTouchStart={handleTouchStart}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
-                    onMouseDown={(e: any) => handleTouchStart({ touches: [{ clientY: e.clientY }] } as any)}
-                    onMouseMove={(e: any) => startY !== null && handleTouchMove({ touches: [{ clientY: e.clientY }] } as any)}
-                    onMouseUp={handleTouchEnd}
-                    onMouseLeave={handleTouchEnd}
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerCancel={handlePointerUp}
                 >
                     <div className="w-12 h-1.5 bg-[var(--color-border)] rounded-full"></div>
                 </div>
@@ -181,13 +187,10 @@ export default function AddExpenseModal() {
                 {/* Header - Swipable Area */}
                 <div
                     className="flex items-center justify-between px-5 py-3 border-b border-[var(--color-border2)] bg-[var(--color-bg)] touch-none cursor-grab active:cursor-grabbing"
-                    onTouchStart={handleTouchStart}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
-                    onMouseDown={(e: any) => handleTouchStart({ touches: [{ clientY: e.clientY }] } as any)}
-                    onMouseMove={(e: any) => startY !== null && handleTouchMove({ touches: [{ clientY: e.clientY }] } as any)}
-                    onMouseUp={handleTouchEnd}
-                    onMouseLeave={handleTouchEnd}
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerCancel={handlePointerUp}
                 >
                     <div className="flex items-center gap-2">
                         <span className="text-[15px] font-bold text-[var(--color-text-primary)] tracking-tight">
@@ -210,9 +213,10 @@ export default function AddExpenseModal() {
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-[var(--color-text-secondary)]">₹</span>
                             <input
                                 ref={inputRef}
-                                type="number"
+                                type="text"
+                                inputMode="decimal"
+                                readOnly
                                 value={amount}
-                                onChange={(e) => setAmount(e.target.value)}
                                 placeholder="0.00"
                                 className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded px-8 py-3 text-[24px] font-medium text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)] transition-colors"
                             />

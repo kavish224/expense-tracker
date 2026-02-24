@@ -73,7 +73,7 @@ export default function Calendar({ selectedDate, onSelect, className = '' }: Cal
             <div className="flex items-center justify-between mb-3 px-1">
                 <button
                     onClick={prevMonth}
-                    className="p-1.5 rounded-full hover:bg-[var(--color-surface2)] text-[var(--color-text-secondary)] transition-colors"
+                    className="p-1.5 rounded-full active:bg-[var(--color-surface2)] active:scale-90 text-[var(--color-text-secondary)] transition-all touch-manipulation"
                 >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="15 18 9 12 15 6" />
@@ -84,7 +84,7 @@ export default function Calendar({ selectedDate, onSelect, className = '' }: Cal
                 </span>
                 <button
                     onClick={nextMonth}
-                    className="p-1.5 rounded-full hover:bg-[var(--color-surface2)] text-[var(--color-text-secondary)] transition-colors"
+                    className="p-1.5 rounded-full active:bg-[var(--color-surface2)] active:scale-90 text-[var(--color-text-secondary)] transition-all touch-manipulation"
                 >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="9 18 15 12 9 6" />

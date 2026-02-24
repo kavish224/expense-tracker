@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import Header from "@/components/Header";
@@ -7,11 +6,6 @@ import BottomNav from "@/components/BottomNav";
 import AddExpenseModal from "@/components/AddExpenseModal";
 import StoreInitializer from "@/components/StoreInitializer";
 import { ToastProvider } from "@/components/Toast";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-});
 
 export const metadata: Metadata = {
   title: "Expense Tracker",
@@ -52,7 +46,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${inter.variable} font-sans antialiased bg-gray-50 dark:bg-[#131722] text-gray-900 dark:text-gray-100 min-h-screen`}
+        className="font-sans antialiased bg-gray-50 dark:bg-[#131722] text-gray-900 dark:text-gray-100 min-h-screen"
       >
         <ThemeProvider>
           <ToastProvider>
