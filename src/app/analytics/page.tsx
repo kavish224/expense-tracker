@@ -236,7 +236,14 @@ export default function Analytics() {
                                 {largestExpenseValue.category}
                             </h4>
                             <p className="text-[12px] text-[var(--color-text-secondary)]">
-                                {new Date(largestExpenseValue.date).toLocaleDateString()} • {largestExpenseValue.note || 'Regular expense'}
+                                {new Date(largestExpenseValue.date).toLocaleString('en-IN', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    hour12: true
+                                })} • {largestExpenseValue.note || 'Regular expense'}
                             </p>
                         </div>
                         <div className="text-right">

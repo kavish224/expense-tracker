@@ -150,10 +150,13 @@ export default function Dashboard() {
                     </span>
                   </div>
                   <div className="text-[11px] text-[var(--color-text-secondary)]">
-                    {new Date(expense.date).toLocaleDateString('en-IN', {
+                    {new Date(expense.date).toLocaleString('en-IN', {
                       day: '2-digit',
                       month: 'short',
-                      year: 'numeric'
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: true
                     })} • {expense.note || 'No note'}{expense.accountName ? ` • ${expense.accountName}` : ''}
                   </div>
                 </div>
