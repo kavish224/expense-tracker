@@ -149,7 +149,7 @@ export default function Dashboard() {
                       {expense.paymentMethod}
                     </span>
                   </div>
-                  <div className="text-[11px] text-[var(--color-text-secondary)] capitalize">
+                  <div className="text-[11px] text-[var(--color-text-secondary)]">
                     {new Date(expense.date).toLocaleDateString('en-IN', {
                       day: '2-digit',
                       month: 'short',

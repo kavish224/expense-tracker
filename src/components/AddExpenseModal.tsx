@@ -63,7 +63,7 @@ export default function AddExpenseModal() {
         });
 
         closeModal();
-    }, [amount, category, paymentMethod, account, addExpense, closeModal]);
+    }, [amount, category, paymentMethod, account, note, addExpense, closeModal]);
 
     // Cleanup state forcefully when modal is forcefully closed externally
     useEffect(() => {
