@@ -11,7 +11,7 @@ export async function GET() {
 
         const result = await sql`
             SELECT e.id, e.amount, e.category, e.payment_method as "paymentMethod", e.date, e.note,
-                   a.id as account_id
+                   a.id as account_id, a.name as account_name
             FROM expenses e
             LEFT JOIN accounts a ON e.account_id = a.id
             WHERE e.user_id = ${session.userId}
@@ -24,7 +24,8 @@ export async function GET() {
             amount: Number(row.amount),
             category: row.category,
             paymentMethod: row.paymentMethod,
-            account: row.account_id, // frontend stores account id in the `account` field
+            account: row.account_id, // holds UUID
+            accountName: row.account_name, // holds Name
             date: new Date(row.date).toISOString(),
             note: row.note,
         }));
@@ -52,9 +53,15 @@ export async function POST(request: Request) {
         }
 
         const result = await sql`
-            INSERT INTO expenses (user_id, amount, category, payment_method, account_id, date, note)
-            VALUES (${session.userId}, ${parsedAmount}, ${category}, ${paymentMethod}, ${account || null}, ${date}, ${note || null})
-            RETURNING id, amount, category, payment_method as "paymentMethod", account_id, date, note
+            WITH inserted AS (
+                INSERT INTO expenses (user_id, amount, category, payment_method, account_id, date, note)
+                VALUES (${session.userId}, ${parsedAmount}, ${category}, ${paymentMethod}, ${account || null}, ${date}, ${note || null})
+                RETURNING id, amount, category, payment_method, account_id, date, note
+            )
+            SELECT i.id, i.amount, i.category, i.payment_method as "paymentMethod", i.account_id, i.date, i.note,
+                   a.name as account_name
+            FROM inserted i
+            LEFT JOIN accounts a ON i.account_id = a.id
         `;
 
         const row = result.rows[0];
@@ -64,6 +71,7 @@ export async function POST(request: Request) {
             category: row.category,
             paymentMethod: row.paymentMethod,
             account: row.account_id,
+            accountName: row.account_name,
             date: new Date(row.date).toISOString(),
             note: row.note,
         };

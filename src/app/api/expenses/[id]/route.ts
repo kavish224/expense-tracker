@@ -52,15 +52,21 @@ export async function PUT(
         }
 
         const result = await sql`
-            UPDATE expenses
-            SET amount = ${parsedAmount},
-                category = ${category},
-                payment_method = ${paymentMethod},
-                account_id = ${account || null},
-                date = ${date},
-                note = ${note || null}
-            WHERE id = ${id} AND user_id = ${session.userId}
-            RETURNING id, amount, category, payment_method as "paymentMethod", account_id, date, note
+            WITH updated AS (
+                UPDATE expenses
+                SET amount = ${parsedAmount},
+                    category = ${category},
+                    payment_method = ${paymentMethod},
+                    account_id = ${account || null},
+                    date = ${date},
+                    note = ${note || null}
+                WHERE id = ${id} AND user_id = ${session.userId}
+                RETURNING id, amount, category, payment_method, account_id, date, note
+            )
+            SELECT u.id, u.amount, u.category, u.payment_method as "paymentMethod", u.account_id, u.date, u.note,
+                   a.name as account_name
+            FROM updated u
+            LEFT JOIN accounts a ON u.account_id = a.id
         `;
 
         if (result.rowCount === 0) {
@@ -74,6 +80,7 @@ export async function PUT(
             category: row.category,
             paymentMethod: row.paymentMethod,
             account: row.account_id,
+            accountName: row.account_name,
             date: new Date(row.date).toISOString(),
             note: row.note,
         };

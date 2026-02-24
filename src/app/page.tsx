@@ -154,7 +154,7 @@ export default function Dashboard() {
                       day: '2-digit',
                       month: 'short',
                       year: 'numeric'
-                    })} • {expense.note || 'No note'}
+                    })} • {expense.note || 'No note'}{expense.accountName ? ` • ${expense.accountName}` : ''}
                   </div>
                 </div>
                 <div className="flex items-center gap-4">

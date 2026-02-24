@@ -212,10 +212,11 @@ export function getAccountSpendingByType(
         return d.getMonth() === month && d.getFullYear() === year;
     });
 
-    // Map account names of the specified type
-    const relevantAccountNames = new Set(
-        accounts.filter((a) => a.type === type).map((a) => a.name)
-    );
+    // Create a lookup map for accounts of the specified type
+    const accountLookup = new Map<string, string>();
+    accounts
+        .filter((a) => a.type === type)
+        .forEach((a) => accountLookup.set(a.id, a.name));
 
     const map = new Map<string, number>();
     filteredExpenses.forEach((e) => {
@@ -223,8 +224,11 @@ export function getAccountSpendingByType(
         const isCCMethod = e.paymentMethod === 'Credit Card';
         const matchesType = (type === 'Bank' && isBankMethod) || (type === 'CreditCard' && isCCMethod);
 
-        if (matchesType && e.account && relevantAccountNames.has(e.account)) {
-            map.set(e.account, (map.get(e.account) || 0) + e.amount);
+        if (matchesType && e.account) {
+            const accountName = accountLookup.get(e.account);
+            if (accountName) {
+                map.set(accountName, (map.get(accountName) || 0) + e.amount);
+            }
         }
     });
 

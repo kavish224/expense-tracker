@@ -99,7 +99,7 @@ export default function ExportCSVButton() {
                 new Date(expense.date).toISOString().split('T')[0],
                 expense.category,
                 expense.paymentMethod,
-                expense.account || '',
+                expense.accountName || '',
                 expense.amount.toString(),
                 `"${(expense.note || '').replace(/"/g, '""')}"`
             ]);

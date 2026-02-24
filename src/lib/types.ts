@@ -3,7 +3,8 @@ export interface Expense {
   amount: number;
   category: string;
   paymentMethod: string;
-  account?: string;
+  account?: string; // This holds the account id (UUID)
+  accountName?: string; // This holds the human-readable account name
   date: string; // ISO string
   note?: string;
 }

@@ -43,7 +43,7 @@ export default function AddExpenseModal() {
     // Update account when payment method changes or accounts are loaded
     useEffect(() => {
         if (filteredAccounts.length > 0) {
-            setAccount(filteredAccounts[0].name);
+            setAccount(filteredAccounts[0].id);
         } else {
             setAccount('');
         }
@@ -227,8 +227,8 @@ export default function AddExpenseModal() {
                                 {filteredAccounts.map((acc) => (
                                     <button
                                         key={acc.id}
-                                        onClick={() => setAccount(acc.name)}
-                                        className={`kavish-chip ${account === acc.name ? 'active' : ''}`}
+                                        onClick={() => setAccount(acc.id)}
+                                        className={`kavish-chip ${account === acc.id ? 'active' : ''}`}
                                     >
                                         {acc.name}
                                     </button>
