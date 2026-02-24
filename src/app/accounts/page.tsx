@@ -163,8 +163,12 @@ export default function Accounts() {
                             <div key={`${account.paymentMethod}-${account.account}-${idx}`} className="kavish-row hover:bg-[var(--color-surface2)]">
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2 mb-0.5">
-                                        <span className="font-semibold text-[13px]">{account.paymentMethod}</span>
-                                        <span className="text-[11px] text-[var(--color-text-secondary)]">({account.account})</span>
+                                        <span className="font-semibold text-[13px]">{account.accountName || account.paymentMethod}</span>
+                                        {account.accountName && (
+                                            <span className="text-[11px] text-[var(--color-text-secondary)] uppercase tracking-tight">
+                                                • {account.paymentMethod}
+                                            </span>
+                                        )}
                                     </div>
                                     <div className="text-[11px] text-[var(--color-text-secondary)]">All-time utilization</div>
                                 </div>

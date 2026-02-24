@@ -246,7 +246,7 @@ export default function Analytics() {
                                     hour: '2-digit',
                                     minute: '2-digit',
                                     hour12: true
-                                })} • {largestExpenseValue.note || 'Regular expense'}
+                                })} • {largestExpenseValue.accountName || largestExpenseValue.paymentMethod} • {largestExpenseValue.note || 'No note'}
                             </p>
                         </div>
                         <div className="text-right flex flex-col items-end gap-2">

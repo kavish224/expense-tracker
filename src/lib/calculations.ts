@@ -153,8 +153,8 @@ export function getMonthOverMonthChange(expenses: Expense[]): {
 
 export function getAccountTotals(
     expenses: Expense[]
-): { account: string; paymentMethod: string; total: number }[] {
-    const map = new Map<string, { account: string; paymentMethod: string; total: number }>();
+): { account: string; accountName?: string; paymentMethod: string; total: number }[] {
+    const map = new Map<string, { account: string; accountName?: string; paymentMethod: string; total: number }>();
 
     expenses.forEach((e) => {
         const key = `${e.paymentMethod}|${e.account || 'Default'}`;
@@ -164,6 +164,7 @@ export function getAccountTotals(
         } else {
             map.set(key, {
                 account: e.account || 'Default',
+                accountName: e.accountName,
                 paymentMethod: e.paymentMethod,
                 total: e.amount,
             });
