@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useExpenseStore } from '@/store/useExpenseStore';
 import { CATEGORIES, PAYMENT_METHODS, Account } from '@/lib/types';
+import Calendar from './Calendar';
 
 export default function AddExpenseModal() {
     const { isModalOpen, closeModal, addExpense, updateExpense, accounts, editingExpense } = useExpenseStore();
@@ -11,6 +12,8 @@ export default function AddExpenseModal() {
     const [paymentMethod, setPaymentMethod] = useState<string>(PAYMENT_METHODS[0]);
     const [account, setAccount] = useState<string>('');
     const [note, setNote] = useState('');
+    const [date, setDate] = useState(new Date().toISOString());
+    const [showCalendar, setShowCalendar] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const backdropRef = useRef<HTMLDivElement>(null);
 
@@ -37,12 +40,14 @@ export default function AddExpenseModal() {
                 setPaymentMethod(editingExpense.paymentMethod);
                 setAccount(editingExpense.account || '');
                 setNote(editingExpense.note || '');
+                setDate(editingExpense.date);
             } else {
                 setAmount('');
                 setCategory(CATEGORIES[0]);
                 setPaymentMethod(PAYMENT_METHODS[0]);
                 setAccount('');
                 setNote('');
+                setDate(new Date().toISOString());
             }
             setTimeout(() => inputRef.current?.focus(), 100);
         }
@@ -68,7 +73,7 @@ export default function AddExpenseModal() {
             category,
             paymentMethod,
             account: account || undefined,
-            date: editingExpense ? editingExpense.date : new Date().toISOString(),
+            date,
             note: note.trim() || undefined,
         };
 
@@ -79,7 +84,7 @@ export default function AddExpenseModal() {
         }
 
         closeModal();
-    }, [amount, category, paymentMethod, account, note, addExpense, updateExpense, editingExpense, closeModal]);
+    }, [amount, category, paymentMethod, account, note, date, addExpense, updateExpense, editingExpense, closeModal]);
 
     // Cleanup state forcefully when modal is forcefully closed externally
     useEffect(() => {
@@ -254,6 +259,55 @@ export default function AddExpenseModal() {
                             </div>
                         </div>
                     )}
+
+                    <div className="space-y-3">
+                        <label className="text-[12px] text-[var(--color-text-secondary)] block mb-1 uppercase font-medium">Date & Time</label>
+                        <div className="flex gap-2">
+                            <div className="flex-1 relative">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCalendar(!showCalendar)}
+                                    className="w-full text-left bg-[var(--color-bg)] border border-[var(--color-border)] rounded px-4 py-2.5 text-[14px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)] flex items-center justify-between"
+                                >
+                                    {new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-text-muted)]">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                                    </svg>
+                                </button>
+
+                                {showCalendar && (
+                                    <div className="absolute bottom-full left-0 mb-2 z-[60] kavish-slide-up">
+                                        <Calendar
+                                            selectedDate={new Date(date)}
+                                            onSelect={(newDate) => {
+                                                const current = new Date(date);
+                                                newDate.setHours(current.getHours(), current.getMinutes(), current.getSeconds());
+                                                setDate(newDate.toISOString());
+                                                setShowCalendar(false);
+                                            }}
+                                            className="shadow-2xl border-[var(--color-border2)] bg-[var(--color-surface)]"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="w-32">
+                                <input
+                                    type="time"
+                                    value={new Date(new Date(date).getTime() - new Date(date).getTimezoneOffset() * 60000).toISOString().slice(11, 16)}
+                                    onChange={(e) => {
+                                        const [hours, minutes] = e.target.value.split(':').map(Number);
+                                        const newDate = new Date(date);
+                                        newDate.setHours(hours, minutes);
+                                        setDate(newDate.toISOString());
+                                    }}
+                                    className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded px-4 py-2.5 text-[14px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)] [color-scheme:dark]"
+                                />
+                            </div>
+                        </div>
+                    </div>
 
                     <div>
                         <label className="text-[12px] text-[var(--color-text-secondary)] block mb-1.5 uppercase font-medium">Note</label>
