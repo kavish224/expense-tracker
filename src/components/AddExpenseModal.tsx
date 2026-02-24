@@ -5,7 +5,7 @@ import { useExpenseStore } from '@/store/useExpenseStore';
 import { CATEGORIES, PAYMENT_METHODS, Account } from '@/lib/types';
 
 export default function AddExpenseModal() {
-    const { isModalOpen, closeModal, addExpense, accounts } = useExpenseStore();
+    const { isModalOpen, closeModal, addExpense, updateExpense, accounts, editingExpense } = useExpenseStore();
     const [amount, setAmount] = useState('');
     const [category, setCategory] = useState<string>(CATEGORIES[0]);
     const [paymentMethod, setPaymentMethod] = useState<string>(PAYMENT_METHODS[0]);
@@ -31,39 +31,55 @@ export default function AddExpenseModal() {
 
     useEffect(() => {
         if (isModalOpen) {
-            setAmount('');
-            setCategory(CATEGORIES[0]);
-            setPaymentMethod(PAYMENT_METHODS[0]);
-            setAccount('');
-            setNote('');
+            if (editingExpense) {
+                setAmount(editingExpense.amount.toString());
+                setCategory(editingExpense.category);
+                setPaymentMethod(editingExpense.paymentMethod);
+                setAccount(editingExpense.account || '');
+                setNote(editingExpense.note || '');
+            } else {
+                setAmount('');
+                setCategory(CATEGORIES[0]);
+                setPaymentMethod(PAYMENT_METHODS[0]);
+                setAccount('');
+                setNote('');
+            }
             setTimeout(() => inputRef.current?.focus(), 100);
         }
-    }, [isModalOpen]);
+    }, [isModalOpen, editingExpense]);
 
     // Update account when payment method changes or accounts are loaded
     useEffect(() => {
+        if (editingExpense && isModalOpen) return; // Don't override account if editing
+
         if (filteredAccounts.length > 0) {
             setAccount(filteredAccounts[0].id);
         } else {
             setAccount('');
         }
-    }, [filteredAccounts]);
+    }, [filteredAccounts, editingExpense, isModalOpen]);
 
     const handleSave = useCallback(async () => {
         const parsed = parseFloat(amount);
         if (isNaN(parsed) || parsed <= 0) return;
 
-        await addExpense({
+        const expenseData = {
             amount: parsed,
             category,
             paymentMethod,
             account: account || undefined,
-            date: new Date().toISOString(),
+            date: editingExpense ? editingExpense.date : new Date().toISOString(),
             note: note.trim() || undefined,
-        });
+        };
+
+        if (editingExpense) {
+            await updateExpense(editingExpense.id, expenseData);
+        } else {
+            await addExpense(expenseData);
+        }
 
         closeModal();
-    }, [amount, category, paymentMethod, account, note, addExpense, closeModal]);
+    }, [amount, category, paymentMethod, account, note, addExpense, updateExpense, editingExpense, closeModal]);
 
     // Cleanup state forcefully when modal is forcefully closed externally
     useEffect(() => {
@@ -163,7 +179,9 @@ export default function AddExpenseModal() {
                     onMouseLeave={handleTouchEnd}
                 >
                     <div className="flex items-center gap-2">
-                        <span className="text-[15px] font-bold text-[var(--color-text-primary)] tracking-tight">Add Expense</span>
+                        <span className="text-[15px] font-bold text-[var(--color-text-primary)] tracking-tight">
+                            {editingExpense ? 'Edit Expense' : 'Add Expense'}
+                        </span>
                     </div>
                     <button onClick={closeModal} className="h-8 w-8 bg-[var(--color-surface2)] rounded-full flex items-center justify-center text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] active:scale-95 transition-all">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -264,7 +282,7 @@ export default function AddExpenseModal() {
                             disabled={!amount || parseFloat(amount) <= 0}
                             className="px-10 py-2.5 text-[14px] font-semibold text-white bg-[var(--color-accent)] hover:bg-[#cc4a38] rounded shadow-lg shadow-[#ff5722]/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                         >
-                            Add
+                            {editingExpense ? 'Update' : 'Add'}
                         </button>
                     </div>
                 </div>

@@ -28,7 +28,7 @@ import { useMemo } from 'react';
 import ExportCSVButton from '@/components/ExportCSVButton';
 
 export default function Analytics() {
-    const { expenses, accounts } = useExpenseStore();
+    const { expenses, accounts, openEditModal } = useExpenseStore();
 
     const monthlyTrend = useMemo(() => getMonthlyTrend(expenses), [expenses]);
     const categoryTotals = useMemo(() => getCategoryTotals(expenses), [expenses]);
@@ -226,13 +226,16 @@ export default function Analytics() {
 
             {/* Largest Expense Highlight */}
             {largestExpenseValue && (
-                <div className="kavish-card p-5 border-l-4 border-[var(--color-red)]">
+                <div
+                    onClick={() => openEditModal(largestExpenseValue)}
+                    className="kavish-card p-5 border-l-4 border-[var(--color-red)] cursor-pointer hover:bg-[var(--color-surface2)] transition-colors group"
+                >
                     <div className="flex justify-between items-start">
                         <div>
                             <p className="text-[12px] uppercase tracking-wider text-[var(--color-text-secondary)] font-medium mb-1">
                                 Maximum Drawdown (Largest Expense)
                             </p>
-                            <h4 className="text-[18px] font-semibold text-[var(--color-text-primary)] mb-1">
+                            <h4 className="text-[18px] font-semibold text-[var(--color-text-primary)] mb-1 group-hover:text-[var(--color-accent)] transition-colors">
                                 {largestExpenseValue.category}
                             </h4>
                             <p className="text-[12px] text-[var(--color-text-secondary)]">
@@ -246,10 +249,13 @@ export default function Analytics() {
                                 })} • {largestExpenseValue.note || 'Regular expense'}
                             </p>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right flex flex-col items-end gap-2">
                             <p className="text-[20px] font-bold kavish-red">
                                 {formatCurrency(largestExpenseValue.amount)}
                             </p>
+                            <div className="text-[10px] text-[var(--color-text-muted)] opacity-0 group-hover:opacity-100 transition-opacity">
+                                Click to edit
+                            </div>
                         </div>
                     </div>
                 </div>

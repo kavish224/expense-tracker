@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { Expense, Account } from '@/lib/types';
 import {
     addExpenseToDB,
+    updateExpenseInDB,
     getAllExpenses,
     deleteExpenseFromDB,
     addAccountToDB,
@@ -22,14 +23,17 @@ interface ExpenseStore {
     user: User | null;
     isLoaded: boolean;
     isModalOpen: boolean;
+    editingExpense: Expense | null;
     setUser: (user: User | null) => void;
     loadExpenses: () => Promise<void>;
     addExpense: (data: Omit<Expense, 'id'>) => Promise<void>;
+    updateExpense: (id: string, data: Partial<Expense>) => Promise<void>;
     deleteExpense: (id: string) => Promise<void>;
     loadAccounts: () => Promise<void>;
     addAccount: (data: Omit<Account, 'id'>) => Promise<void>;
     deleteAccount: (id: string) => Promise<void>;
     openModal: () => void;
+    openEditModal: (expense: Expense) => void;
     closeModal: () => void;
 }
 
@@ -39,6 +43,7 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
     user: null,
     isLoaded: false,
     isModalOpen: false,
+    editingExpense: null,
 
     setUser: (user) => set({ user }),
 
@@ -66,6 +71,13 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
         set({ expenses: [newExpense, ...get().expenses] });
     },
 
+    updateExpense: async (id, data) => {
+        const updatedExpense = await updateExpenseInDB(id, data);
+        set({
+            expenses: get().expenses.map((e) => (e.id === id ? updatedExpense : e)),
+        });
+    },
+
     deleteExpense: async (id) => {
         await deleteExpenseFromDB(id);
         set({ expenses: get().expenses.filter((e) => e.id !== id) });
@@ -86,6 +98,7 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
         set({ accounts: get().accounts.filter((a) => a.id !== id) });
     },
 
-    openModal: () => set({ isModalOpen: true }),
-    closeModal: () => set({ isModalOpen: false }),
+    openModal: () => set({ isModalOpen: true, editingExpense: null }),
+    openEditModal: (expense) => set({ isModalOpen: true, editingExpense: expense }),
+    closeModal: () => set({ isModalOpen: false, editingExpense: null }),
 }));

@@ -16,6 +16,7 @@ import { useMemo } from 'react';
 export default function Dashboard() {
   const expenses = useExpenseStore((s) => s.expenses);
   const deleteExpense = useExpenseStore((s) => s.deleteExpense);
+  const openEditModal = useExpenseStore((s) => s.openEditModal);
 
   const monthlyTotal = useMemo(() => getMonthlyTotal(expenses), [expenses]);
   const todayTotal = useMemo(() => getTodayTotal(expenses), [expenses]);
@@ -160,20 +161,32 @@ export default function Dashboard() {
                     })} • {expense.note || 'No note'}{expense.accountName ? ` • ${expense.accountName}` : ''}
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
                   <span className={`font-semibold text-[13px] ${expense.amount > 1000 ? 'kavish-red' : 'kavish-green'}`}>
                     ₹{expense.amount.toLocaleString('en-IN')}
                   </span>
-                  <button
-                    onClick={() => deleteExpense(expense.id)}
-                    className="md:opacity-0 md:group-hover:opacity-100 h-8 w-8 ml-2 rounded-full bg-[var(--color-surface2)] md:bg-transparent flex items-center justify-center text-[var(--color-text-secondary)] hover:text-red-500 hover:bg-red-500/10 active:scale-95 transition-all"
-                    aria-label="Delete"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-                    </svg>
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => openEditModal(expense)}
+                      className="md:opacity-0 md:group-hover:opacity-100 h-8 w-8 rounded-full bg-[var(--color-surface2)] md:bg-transparent flex items-center justify-center text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 active:scale-95 transition-all"
+                      aria-label="Edit"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => deleteExpense(expense.id)}
+                      className="md:opacity-0 md:group-hover:opacity-100 h-8 w-8 rounded-full bg-[var(--color-surface2)] md:bg-transparent flex items-center justify-center text-[var(--color-text-secondary)] hover:text-red-500 hover:bg-red-500/10 active:scale-95 transition-all"
+                      aria-label="Delete"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
