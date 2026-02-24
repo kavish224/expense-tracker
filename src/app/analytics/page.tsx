@@ -24,11 +24,18 @@ import {
     Tooltip,
     CartesianGrid,
 } from 'recharts';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import ExportCSVButton from '@/components/ExportCSVButton';
 
 export default function Analytics() {
     const { expenses, accounts, openEditModal } = useExpenseStore();
+
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterCategory, setFilterCategory] = useState<string>('All');
+    const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>('All');
+    const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    const [showFilters, setShowFilters] = useState(false);
 
     const monthlyTrend = useMemo(() => getMonthlyTrend(expenses), [expenses]);
     const categoryTotals = useMemo(() => getCategoryTotals(expenses), [expenses]);
@@ -38,8 +45,45 @@ export default function Analytics() {
     const bankSpending = useMemo(() => getAccountSpendingByType(expenses, accounts, 'Bank'), [expenses, accounts]);
     const creditCardSpending = useMemo(() => getAccountSpendingByType(expenses, accounts, 'CreditCard'), [expenses, accounts]);
 
+    const filteredExpenses = useMemo(() => {
+        let result = [...expenses];
+
+        // Search
+        if (searchTerm) {
+            const lowSearch = searchTerm.toLowerCase();
+            result = result.filter(e =>
+                e.category.toLowerCase().includes(lowSearch) ||
+                (e.note && e.note.toLowerCase().includes(lowSearch)) ||
+                (e.accountName && e.accountName.toLowerCase().includes(lowSearch))
+            );
+        }
+
+        // Category Filter
+        if (filterCategory !== 'All') {
+            result = result.filter(e => e.category === filterCategory);
+        }
+
+        // Payment Method Filter
+        if (filterPaymentMethod !== 'All') {
+            result = result.filter(e => e.paymentMethod === filterPaymentMethod);
+        }
+
+        // Sorting
+        result.sort((a, b) => {
+            if (sortBy === 'date') {
+                const timeA = new Date(a.date).getTime();
+                const timeB = new Date(b.date).getTime();
+                return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+            } else {
+                return sortOrder === 'desc' ? b.amount - a.amount : a.amount - b.amount;
+            }
+        });
+
+        return result;
+    }, [expenses, searchTerm, filterCategory, filterPaymentMethod, sortBy, sortOrder]);
+
     return (
-        <main className="mx-auto max-w-lg px-4 py-6 space-y-6">
+        <main className="mx-auto max-w-lg px-4 py-6 space-y-6 pb-24">
             <div className="flex items-center justify-between mb-2">
                 <h2 className="text-[18px] font-bold text-[var(--color-text-primary)]">Analytics</h2>
                 <ExportCSVButton />
@@ -47,19 +91,19 @@ export default function Analytics() {
 
             {/* Analytics Stats */}
             <div className="grid grid-cols-2 gap-4">
-                <div className="kavish-card p-4">
-                    <p className="text-[12px] uppercase tracking-wider text-[var(--color-text-secondary)] font-medium mb-1">
+                <div className="kavish-card p-4 bg-gradient-to-br from-[var(--color-surface)] to-[var(--color-bg)]">
+                    <p className="text-[11px] uppercase tracking-wider text-[var(--color-text-secondary)] font-bold mb-1 opacity-80">
                         Daily Avg
                     </p>
-                    <p className="text-[20px] font-semibold text-[var(--color-text-primary)]">
+                    <p className="text-[22px] font-black text-[var(--color-text-primary)]">
                         {formatCurrency(dailyAverage)}
                     </p>
                 </div>
-                <div className="kavish-card p-4">
-                    <p className="text-[12px] uppercase tracking-wider text-[var(--color-text-secondary)] font-medium mb-1">
+                <div className="kavish-card p-4 bg-gradient-to-br from-[var(--color-surface)] to-[var(--color-bg)]">
+                    <p className="text-[11px] uppercase tracking-wider text-[var(--color-text-secondary)] font-bold mb-1 opacity-80">
                         MoM Change
                     </p>
-                    <p className={`text-[20px] font-semibold ${momChangeData.change >= 0 ? 'kavish-red' : 'kavish-green'}`}>
+                    <p className={`text-[22px] font-black ${momChangeData.change >= 0 ? 'kavish-red' : 'kavish-green'}`}>
                         {momChangeData.change > 0 ? '+' : ''}{momChangeData.change.toFixed(1)}%
                     </p>
                 </div>
@@ -89,17 +133,18 @@ export default function Analytics() {
                                 contentStyle={{
                                     backgroundColor: 'var(--color-surface)',
                                     border: '1px solid var(--color-border)',
-                                    borderRadius: '4px',
+                                    borderRadius: '12px',
                                     fontSize: '12px',
+                                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
                                 }}
                                 itemStyle={{ color: 'var(--color-text-primary)' }}
                             />
                             <Line
                                 type="monotone"
                                 dataKey="total"
-                                stroke="#ff5722"
-                                strokeWidth={2.5}
-                                dot={{ fill: '#ff5722', r: 4, strokeWidth: 0 }}
+                                stroke="var(--color-accent)"
+                                strokeWidth={3}
+                                dot={{ fill: 'var(--color-accent)', r: 4, strokeWidth: 0 }}
                                 activeDot={{ r: 6, strokeWidth: 0 }}
                             />
                         </LineChart>
@@ -127,7 +172,7 @@ export default function Analytics() {
                                     contentStyle={{
                                         backgroundColor: 'var(--color-surface)',
                                         border: '1px solid var(--color-border)',
-                                        borderRadius: '4px',
+                                        borderRadius: '12px',
                                         fontSize: '12px',
                                     }}
                                     itemStyle={{ color: 'var(--color-text-primary)' }}
@@ -136,7 +181,7 @@ export default function Analytics() {
                                     {categoryTotals.map((entry, index) => (
                                         <Cell
                                             key={`cell-${index}`}
-                                            fill={CATEGORY_COLORS[entry.name as keyof typeof CATEGORY_COLORS] || '#ff5722'}
+                                            fill={CATEGORY_COLORS[entry.name as keyof typeof CATEGORY_COLORS] || 'var(--color-accent)'}
                                         />
                                     ))}
                                 </Bar>
@@ -224,42 +269,163 @@ export default function Analytics() {
                 </div>
             </DashboardCard>
 
-            {/* Largest Expense Highlight */}
-            {largestExpenseValue && (
-                <div
-                    onClick={() => openEditModal(largestExpenseValue)}
-                    className="kavish-card p-5 border-l-4 border-[var(--color-red)] cursor-pointer hover:bg-[var(--color-surface2)] transition-colors group"
-                >
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <p className="text-[12px] uppercase tracking-wider text-[var(--color-text-secondary)] font-medium mb-1">
-                                Maximum Drawdown (Largest Expense)
-                            </p>
-                            <h4 className="text-[18px] font-semibold text-[var(--color-text-primary)] mb-1 group-hover:text-[var(--color-accent)] transition-colors">
-                                {largestExpenseValue.category}
-                            </h4>
-                            <p className="text-[12px] text-[var(--color-text-secondary)]">
-                                {new Date(largestExpenseValue.date).toLocaleString('en-IN', {
-                                    day: '2-digit',
-                                    month: 'short',
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                    hour12: true
-                                })} • {largestExpenseValue.accountName || largestExpenseValue.paymentMethod} • {largestExpenseValue.note || 'No note'}
-                            </p>
+            {/* Expense Explorer */}
+            <div className="space-y-4 pt-4">
+                <div className="flex items-center justify-between px-2">
+                    <h3 className="text-[15px] font-black uppercase tracking-widest text-[var(--color-text-primary)]">Expense Explorer</h3>
+                    <button
+                        onClick={() => setShowFilters(!showFilters)}
+                        className={`p-2 rounded-lg transition-all ${showFilters ? 'bg-[var(--color-accent)] text-white' : 'bg-[var(--color-surface2)] text-[var(--color-text-secondary)]'}`}
+                    >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                        </svg>
+                    </button>
+                </div>
+
+                {/* Filter Controls */}
+                {showFilters && (
+                    <div className="kavish-card p-4 space-y-4 bg-[var(--color-surface2)] transition-all animate-in fade-in slide-in-from-top-4">
+                        <div className="relative">
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="Search by note, category or account..."
+                                className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl pl-10 pr-4 py-2 text-[13px] outline-none focus:border-[var(--color-accent)]"
+                            />
+                            <svg className="absolute left-3 top-2.5 text-[var(--color-text-muted)]" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
                         </div>
-                        <div className="text-right flex flex-col items-end gap-2">
-                            <p className="text-[20px] font-bold kavish-red">
-                                {formatCurrency(largestExpenseValue.amount)}
-                            </p>
-                            <div className="text-[10px] text-[var(--color-text-muted)] opacity-0 group-hover:opacity-100 transition-opacity">
-                                Click to edit
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-[10px] uppercase font-bold text-[var(--color-text-muted)] mb-1 block">Category</label>
+                                <select
+                                    value={filterCategory}
+                                    onChange={(e) => setFilterCategory(e.target.value)}
+                                    className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-[13px] outline-none"
+                                >
+                                    <option value="All">All Categories</option>
+                                    {Object.keys(CATEGORY_COLORS).map(cat => (
+                                        <option key={cat} value={cat}>{cat}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-[10px] uppercase font-bold text-[var(--color-text-muted)] mb-1 block">Sort By</label>
+                                <div className="flex bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl overflow-hidden">
+                                    <button
+                                        onClick={() => setSortBy('date')}
+                                        className={`flex-1 py-1.5 text-[11px] font-bold ${sortBy === 'date' ? 'bg-[var(--color-accent)] text-white' : 'text-[var(--color-text-secondary)]'}`}
+                                    >
+                                        Date
+                                    </button>
+                                    <button
+                                        onClick={() => setSortBy('amount')}
+                                        className={`flex-1 py-1.5 text-[11px] font-bold ${sortBy === 'amount' ? 'bg-[var(--color-accent)] text-white' : 'text-[var(--color-text-secondary)]'}`}
+                                    >
+                                        Amount
+                                    </button>
+                                </div>
                             </div>
                         </div>
+
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                                className="flex-1 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl py-2 text-[12px] font-bold text-[var(--color-text-primary)] flex items-center justify-center gap-2"
+                            >
+                                {sortOrder === 'desc' ? 'Descending' : 'Ascending'}
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className={sortOrder === 'asc' ? 'rotate-180 transition-transform' : 'transition-transform'}>
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setSearchTerm('');
+                                    setFilterCategory('All');
+                                    setFilterPaymentMethod('All');
+                                    setSortBy('date');
+                                    setSortOrder('desc');
+                                }}
+                                className="px-4 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl text-[12px] font-bold text-[var(--color-text-muted)]"
+                            >
+                                Reset
+                            </button>
+                        </div>
                     </div>
+                )}
+
+                {/* Explorer List */}
+                <div className="kavish-card overflow-hidden">
+                    {filteredExpenses.length > 0 ? (
+                        <div className="divide-y divide-[var(--color-border2)]">
+                            {filteredExpenses.map((expense) => (
+                                <div
+                                    key={expense.id}
+                                    onClick={() => openEditModal(expense)}
+                                    className="kavish-row hover:bg-[var(--color-surface2)] active:bg-[var(--color-surface2)] transition-colors group cursor-pointer"
+                                >
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-0.5">
+                                            <span className="font-bold text-[13px] text-[var(--color-text-primary)] group-hover:text-[var(--color-accent)] transition-colors">
+                                                {expense.category}
+                                            </span>
+                                            <span className="text-[10px] px-1.5 py-0.5 bg-[var(--color-surface2)] text-[var(--color-text-muted)] rounded font-bold uppercase tracking-wider">
+                                                {expense.paymentMethod}
+                                            </span>
+                                        </div>
+                                        <div className="text-[11px] text-[var(--color-text-secondary)] flex flex-wrap gap-x-2 gap-y-0.5 items-center">
+                                            <span className="font-semibold">
+                                                {new Date(expense.date).toLocaleDateString('en-IN', {
+                                                    day: '2-digit',
+                                                    month: 'short',
+                                                    year: 'numeric'
+                                                })}
+                                            </span>
+                                            <span className="text-[var(--color-text-muted)]">•</span>
+                                            <span>
+                                                {expense.accountName || 'No account'}
+                                            </span>
+                                            {expense.note && (
+                                                <>
+                                                    <span className="text-[var(--color-text-muted)]">•</span>
+                                                    <span className="italic truncate max-w-[150px]">{expense.note}</span>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className={`text-[15px] font-black ${expense.amount > 1000 ? 'kavish-red' : 'kavish-green'}`}>
+                                            ₹{expense.amount.toLocaleString('en-IN')}
+                                        </p>
+                                        <p className="text-[10px] text-[var(--color-text-muted)] font-medium">
+                                            {new Date(expense.date).toLocaleTimeString('en-IN', {
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                                hour12: true
+                                            })}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="py-12 text-center space-y-2">
+                            <div className="text-[var(--color-text-muted)] opacity-20 flex justify-center">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                </svg>
+                            </div>
+                            <p className="text-[13px] text-[var(--color-text-secondary)] font-medium">No transactions match your search</p>
+                        </div>
+                    )}
                 </div>
-            )}
+            </div>
         </main>
     );
 }
