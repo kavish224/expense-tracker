@@ -95,7 +95,7 @@ export default function Analytics() {
     }, [filteredExpenses, sortBy]);
 
     return (
-        <main className="mx-auto max-w-lg px-4 py-6 space-y-6 pb-28">
+        <main className="mx-auto max-w-lg px-4 py-6 space-y-6 pb-6">
             <div className="flex items-center justify-between">
                 <h2 className="text-[20px] font-black text-[var(--color-text-primary)] tracking-tight">Analytics</h2>
                 <ExportCSVButton />

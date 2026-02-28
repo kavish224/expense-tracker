@@ -50,7 +50,7 @@ export default function BottomNav() {
     if (isModalOpen) return null;
 
     return (
-        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--color-border)] bg-[var(--color-surface)] shadow-[0_-4px_20px_rgba(0,0,0,0.06)] safe-bottom-plus pt-1" style={{ transform: 'translateZ(0)', willChange: 'transform' }}>
+        <nav className="shrink-0 border-t border-(--color-border) bg-(--color-surface) shadow-[0_-4px_20px_rgba(0,0,0,0.06)] safe-bottom-plus pt-1">
             <div className="mx-auto grid max-w-lg grid-cols-4 items-center">
 
                 {/* The Original 3 Text Links */}

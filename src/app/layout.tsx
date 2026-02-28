@@ -56,8 +56,8 @@ export default function RootLayout({
               <div id="scroll-container" className="flex-1 overflow-y-auto overscroll-none">
                 {children}
               </div>
+              <BottomNav />
             </div>
-            <BottomNav />
             <AddExpenseModal />
           </ToastProvider>
         </ThemeProvider>
