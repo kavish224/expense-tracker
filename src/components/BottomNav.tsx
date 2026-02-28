@@ -43,6 +43,11 @@ const navItems = [
 export default function BottomNav() {
     const pathname = usePathname();
     const openModal = useExpenseStore((s) => s.openModal);
+    const isModalOpen = useExpenseStore((s) => s.isModalOpen);
+
+    // Hide entirely when the modal is open — prevents iOS keyboard from pushing
+    // the fixed nav up into the middle of the screen
+    if (isModalOpen) return null;
 
     return (
         <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--color-border)] bg-[var(--color-surface)] shadow-[0_-4px_20px_rgba(0,0,0,0.06)] safe-bottom-plus pt-1" style={{ transform: 'translateZ(0)', willChange: 'transform' }}>

@@ -25,6 +25,29 @@ export default function AddExpenseModal() {
     const isDragging = useRef(false);
     const translateY = dragCurrentY && dragStartY ? Math.max(0, dragCurrentY - dragStartY) : 0;
 
+    // Visual Viewport API — tracks the actual visible bottom of the screen.
+    // On iOS, when the software keyboard opens, visualViewport.height shrinks
+    // and visualViewport.offsetTop increases. We use this to push the sheet up
+    // so it always sits flush at the keyboard top instead of going off-screen.
+    const [viewportOffset, setViewportOffset] = useState(0);
+    useEffect(() => {
+        const vv = window.visualViewport;
+        if (!vv) return;
+
+        const onResize = () => {
+            // How far the visual viewport bottom is from the layout viewport bottom
+            const offset = window.innerHeight - (vv.height + vv.offsetTop);
+            setViewportOffset(Math.max(0, offset));
+        };
+
+        vv.addEventListener('resize', onResize);
+        vv.addEventListener('scroll', onResize);
+        return () => {
+            vv.removeEventListener('resize', onResize);
+            vv.removeEventListener('scroll', onResize);
+        };
+    }, []);
+
     // Filter accounts based on selected payment method
     const filteredAccounts = useMemo(() => {
         if (paymentMethod === 'UPI' || paymentMethod === 'Debit Card' || paymentMethod === 'Net Banking') {
@@ -175,9 +198,11 @@ export default function AddExpenseModal() {
             style={{ opacity: translateY > 0 ? 1 - translateY / 500 : 1 }}
         >
             <div
-                className="w-full max-w-lg kavish-slide-up rounded-t-3xl bg-[var(--color-surface)] shadow-[0_-10px_40px_rgba(0,0,0,0.15)] flex flex-col max-h-[85vh] transition-transform"
+                className="w-full max-w-lg kavish-slide-up rounded-t-3xl bg-[var(--color-surface)] shadow-[0_-10px_40px_rgba(0,0,0,0.15)] flex flex-col max-h-[85vh]"
                 style={{
-                    transform: `translateY(${translateY}px)`,
+                    // viewportOffset lifts the sheet above the iOS keyboard.
+                    // translateY handles the swipe-to-dismiss gesture.
+                    transform: `translateY(${translateY - viewportOffset}px)`,
                     transition: dragStartY === null ? 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)' : 'none'
                 }}
             >
