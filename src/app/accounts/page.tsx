@@ -45,7 +45,7 @@ export default function Accounts() {
     };
 
     return (
-        <main className="mx-auto max-w-lg px-4 py-6 space-y-6 mb-20">
+        <main className="mx-auto max-w-lg px-4 py-6 space-y-6 pb-28">
             <div className="kavish-card p-6 bg-gradient-to-br from-[var(--color-surface)] to-[var(--color-bg)]">
                 <p className="text-[12px] uppercase tracking-wider text-[var(--color-text-secondary)] font-medium mb-1">
                     Total Lifetime Spend

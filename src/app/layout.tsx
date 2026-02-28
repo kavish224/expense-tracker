@@ -46,13 +46,17 @@ export default function RootLayout({
         />
       </head>
       <body
-        className="font-sans antialiased bg-gray-50 dark:bg-[#131722] text-gray-900 dark:text-gray-100 min-h-screen"
+        className="font-sans antialiased bg-(--color-bg) text-(--color-text-primary) h-dvh overflow-hidden"
       >
         <ThemeProvider>
           <ToastProvider>
             <StoreInitializer />
-            <Header />
-            <main className="mx-auto max-w-lg px-4 py-4">{children}</main>
+            <div className="flex flex-col h-dvh">
+              <Header />
+              <div id="scroll-container" className="flex-1 overflow-y-auto overscroll-none">
+                {children}
+              </div>
+            </div>
             <BottomNav />
             <AddExpenseModal />
           </ToastProvider>

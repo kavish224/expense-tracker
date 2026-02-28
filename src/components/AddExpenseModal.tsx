@@ -95,12 +95,20 @@ export default function AddExpenseModal() {
     }, [amount, category, paymentMethod, account, note, date, addExpense, updateExpense, editingExpense, closeModal]);
 
     // Cleanup state forcefully when modal is forcefully closed externally
+    // Also lock the scroll container so background doesn't scroll behind the sheet
     useEffect(() => {
+        const container = document.getElementById('scroll-container');
         if (!isModalOpen) {
             setDragStartY(null);
             setDragCurrentY(null);
             isDragging.current = false;
+            if (container) container.style.overflow = '';
+        } else {
+            if (container) container.style.overflow = 'hidden';
         }
+        return () => {
+            if (container) container.style.overflow = '';
+        };
     }, [isModalOpen]);
 
     const handleBackdropClick = useCallback(

@@ -66,6 +66,9 @@
 html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Prevent iOS text size adjustment on orientation change */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -73,8 +76,20 @@ body {
   font-size: 13px;
   background-color: var(--color-bg);
   color: var(--color-text-primary);
-  overscroll-behavior-y: none;
-  transition: background-color 0.2s, color 0.2s;
+  overscroll-behavior: none;
+  /* Faster theme transitions */
+  transition: background-color 0.15s, color 0.15s;
+  /* Prevent callout on long press */
+  -webkit-touch-callout: none;
+}
+
+/* Scroll container: iOS momentum + GPU layer */
+#scroll-container {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  /* Promote to GPU compositor layer so fixed nav never repaints during scroll */
+  transform: translateZ(0);
+  will-change: scroll-position;
 }
 
 /* ── iOS Safe Area ───────────────────────────────────────── */
@@ -157,15 +172,18 @@ input[type='number'] {
   background: var(--color-surface);
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: all 0.12s;
+  /* Snappier on touch — 80ms feels instant */
+  transition: all 0.08s ease-out;
   user-select: none;
+  /* Prevent text selection on double-tap */
+  -webkit-user-select: none;
 }
 
 .kavish-chip:active,
 .kavish-chip:focus-visible {
   border-color: var(--color-accent);
   color: var(--color-accent);
-  transform: scale(0.95);
+  transform: scale(0.94);
 }
 
 .kavish-chip.active {
@@ -181,7 +199,7 @@ input[type='number'] {
   padding: 10px 12px;
   border-bottom: 1px solid var(--color-border2);
   font-size: 13px;
-  transition: background 0.1s;
+  transition: background 0.08s ease-out, transform 0.08s ease-out;
   cursor: default;
 }
 
@@ -191,7 +209,7 @@ input[type='number'] {
 
 .kavish-row:active {
   background: var(--color-surface2);
-  transform: scale(0.99);
+  transform: scale(0.985);
 }
 
 /* ── Focus indicators for keyboard navigation ───────────────────── */

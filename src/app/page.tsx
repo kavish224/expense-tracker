@@ -33,7 +33,7 @@ export default function Dashboard() {
   }, [expenses]);
 
   return (
-    <main className="mx-auto max-w-lg px-4 py-6 space-y-6">
+    <main className="mx-auto max-w-lg px-4 py-6 space-y-6 pb-28">
       {/* kavish Style Key Stats */}
       <div className="grid grid-cols-2 gap-4">
         <div className="kavish-card p-4">

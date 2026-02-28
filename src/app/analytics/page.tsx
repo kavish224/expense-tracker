@@ -95,7 +95,7 @@ export default function Analytics() {
     }, [filteredExpenses, sortBy]);
 
     return (
-        <main className="mx-auto max-w-lg px-4 py-6 space-y-6 pb-24">
+        <main className="mx-auto max-w-lg px-4 py-6 space-y-6 pb-28">
             <div className="flex items-center justify-between">
                 <h2 className="text-[20px] font-black text-[var(--color-text-primary)] tracking-tight">Analytics</h2>
                 <ExportCSVButton />
@@ -242,7 +242,7 @@ export default function Analytics() {
                     {groupedExpenses.length > 0 ? (
                         groupedExpenses.map((group) => (
                             <div key={group.date} className="space-y-3">
-                                <div className="flex items-center justify-between sticky top-0 py-1 bg-[var(--color-bg)] z-10">
+                                <div className="flex items-center justify-between sticky top-0 py-1 bg-(--color-bg) z-10">
                                     <h4 className="text-[11px] font-black text-[var(--color-text-muted)] uppercase tracking-[0.1em]">
                                         {sortBy === 'amount' ? 'All Transactions' : group.date}
                                     </h4>
