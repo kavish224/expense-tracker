@@ -84,9 +84,14 @@ html {
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  /* The area below 100svh (home indicator zone) is painted by the html element.
-     Match it to the nav background so there's no black gap on iPhone. */
-  background-color: var(--color-nav-bg);
+  /* The area below the safe-area (home indicator zone) is painted by html.
+     Use OPAQUE colors that match the nav visually — semi-transparent vars
+     render darker on html since there's nothing behind to blend with. */
+  background-color: #ffffff;
+}
+.dark html,
+html.dark {
+  background-color: #1c1c1e;
 }
 
 body {
