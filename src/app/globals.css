@@ -83,13 +83,18 @@ body {
   -webkit-touch-callout: none;
 }
 
-/* Scroll container: iOS momentum + GPU layer */
+/* Scroll container: iOS momentum + GPU compositor layer */
 #scroll-container {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
-  /* Promote to GPU compositor layer so fixed nav never repaints during scroll */
   transform: translateZ(0);
   will-change: scroll-position;
+}
+
+/* Eliminate the 300ms iOS tap delay on all interactive elements.
+   This makes every tap feel instant — equivalent to native app response. */
+a, button, [role="button"] {
+  touch-action: manipulation;
 }
 
 /* ── iOS Safe Area ───────────────────────────────────────── */

@@ -20,31 +20,26 @@ export function useTheme() {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const [theme, setTheme] = useState<Theme>('dark');
-    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
         const stored = localStorage.getItem('theme') as Theme | null;
-        if (stored) {
-            setTheme(stored);
-        }
-        setMounted(true);
+        const resolved = stored ?? 'dark';
+        setTheme(resolved);
+        document.documentElement.classList.toggle('dark', resolved === 'dark');
     }, []);
-
-    useEffect(() => {
-        if (mounted) {
-            document.documentElement.classList.toggle('dark', theme === 'dark');
-            localStorage.setItem('theme', theme);
-        }
-    }, [theme, mounted]);
 
     const toggleTheme = useCallback(() => {
-        setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+        setTheme((prev) => {
+            const next = prev === 'dark' ? 'light' : 'dark';
+            document.documentElement.classList.toggle('dark', next === 'dark');
+            localStorage.setItem('theme', next);
+            return next;
+        });
     }, []);
 
-    if (!mounted) {
-        return <div className="min-h-screen bg-[#131722]" />;
-    }
-
+    // Render children immediately — no blank-screen flash.
+    // The <html> element already has className="dark" as server default,
+    // so there is no mismatch on first paint.
     return (
         <ThemeContext.Provider value={{ theme, toggleTheme }}>
             {children}

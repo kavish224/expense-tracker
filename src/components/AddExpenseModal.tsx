@@ -17,6 +17,7 @@ export default function AddExpenseModal() {
     const [showCalendar, setShowCalendar] = useState(false);
     const [showTimePicker, setShowTimePicker] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
+    const noteRef = useRef<HTMLInputElement>(null);
     const backdropRef = useRef<HTMLDivElement>(null);
 
     // Swipe down tracking with pointer events
@@ -124,6 +125,7 @@ export default function AddExpenseModal() {
         if (!isModalOpen) {
             setDragStartY(null);
             setDragCurrentY(null);
+            setViewportOffset(0);
             isDragging.current = false;
             if (container) container.style.overflow = '';
         } else {
@@ -144,6 +146,9 @@ export default function AddExpenseModal() {
     );
 
     const handleKeypadPress = useCallback((key: string) => {
+        // Dismiss the native iOS keyboard if the note field is focused
+        noteRef.current?.blur();
+
         if (key === 'backspace') {
             setAmount((prev) => prev.slice(0, -1));
         } else if (key === '.' && !amount.includes('.')) {
@@ -375,6 +380,7 @@ export default function AddExpenseModal() {
                     <div>
                         <label className="text-[12px] text-[var(--color-text-secondary)] block mb-1.5 uppercase font-medium">Note</label>
                         <input
+                            ref={noteRef}
                             type="text"
                             value={note}
                             onChange={(e) => setNote(e.target.value)}

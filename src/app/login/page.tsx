@@ -32,7 +32,7 @@ export default function LoginPage() {
                 setUser(data.user);
                 router.replace('/');
             }
-        } catch (err) {
+        } catch {
             setError('An unexpected error occurred');
         } finally {
             setLoading(false);
@@ -40,11 +40,13 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="flex h-[80vh] flex-col items-center justify-center px-4">
-            <div className="w-full max-w-sm rounded-[24px] bg-[var(--color-surface)] p-8 shadow-sm border border-[var(--color-border)]">
+        // overflow-y-auto + min-h-dvh: when the iOS keyboard opens and shrinks
+        // the viewport, the container becomes scrollable so the form stays reachable
+        <div className="min-h-dvh overflow-y-auto flex flex-col items-center justify-center px-4 py-10">
+            <div className="w-full max-w-sm rounded-3xl bg-(--color-surface) p-8 shadow-sm border border-(--color-border)">
                 <div className="mb-8 text-center">
-                    <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">Welcome Back</h1>
-                    <p className="mt-2 text-[14px] text-[var(--color-text-secondary)]">Sign in to your account</p>
+                    <h1 className="text-2xl font-bold text-(--color-text-primary)">Welcome Back</h1>
+                    <p className="mt-2 text-[14px] text-(--color-text-secondary)">Sign in to your account</p>
                 </div>
 
                 {error && (
@@ -55,23 +57,25 @@ export default function LoginPage() {
 
                 <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                     <div>
-                        <label className="mb-1.5 block text-[13px] font-medium text-[var(--color-text-secondary)]">Email</label>
+                        <label className="mb-1.5 block text-[13px] font-medium text-(--color-text-secondary)">Email</label>
                         <input
                             type="email"
+                            autoComplete="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="h-12 w-full rounded-xl bg-[var(--color-surface2)] px-4 text-[15px] outline-none border border-transparent focus:border-[var(--color-border)] transition-colors"
+                            className="h-12 w-full rounded-xl bg-(--color-surface2) px-4 text-[15px] outline-none border border-transparent focus:border-(--color-accent) transition-colors"
                             placeholder="you@example.com"
                             required
                         />
                     </div>
                     <div>
-                        <label className="mb-1.5 block text-[13px] font-medium text-[var(--color-text-secondary)]">Password</label>
+                        <label className="mb-1.5 block text-[13px] font-medium text-(--color-text-secondary)">Password</label>
                         <input
                             type="password"
+                            autoComplete="current-password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="h-12 w-full rounded-xl bg-[var(--color-surface2)] px-4 text-[15px] outline-none border border-transparent focus:border-[var(--color-border)] transition-colors"
+                            className="h-12 w-full rounded-xl bg-(--color-surface2) px-4 text-[15px] outline-none border border-transparent focus:border-(--color-accent) transition-colors"
                             placeholder="••••••••"
                             required
                         />
@@ -80,14 +84,14 @@ export default function LoginPage() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="mt-4 flex h-12 w-full items-center justify-center rounded-xl bg-[#ff5722] text-[15px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                        className="mt-4 flex h-12 w-full items-center justify-center rounded-xl bg-[#ff5722] text-[15px] font-medium text-white active:opacity-80 disabled:opacity-50 transition-opacity touch-manipulation"
                     >
                         {loading ? 'Signing in...' : 'Sign In'}
                     </button>
 
-                    <p className="mt-4 text-center text-[13px] text-[var(--color-text-secondary)]">
+                    <p className="mt-4 text-center text-[13px] text-(--color-text-secondary)">
                         Don&apos;t have an account?{' '}
-                        <button type="button" onClick={() => router.push('/signup')} className="font-medium text-[#ff5722] hover:underline">
+                        <button type="button" onClick={() => router.push('/signup')} className="font-medium text-[#ff5722] active:opacity-70 touch-manipulation">
                             Sign up
                         </button>
                     </p>
