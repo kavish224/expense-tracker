@@ -55,7 +55,7 @@ export default function BottomNav() {
                 background: 'var(--color-nav-bg)',
                 backdropFilter: 'blur(20px)',
                 WebkitBackdropFilter: 'blur(20px)',
-                paddingBottom: 'max(env(safe-area-inset-bottom), 20px)',
+                paddingBottom: 'env(safe-area-inset-bottom)',
             }}
         >
             <div className="mx-auto grid max-w-lg grid-cols-4 items-center h-[49px]">
