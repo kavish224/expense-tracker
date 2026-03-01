@@ -32,13 +32,20 @@ export async function POST(request: Request) {
 
         const { name, type } = await request.json();
 
-        if (!name || !type) {
-            return NextResponse.json({ error: 'Name and type are required' }, { status: 400 });
+        const VALID_TYPES = ['Bank', 'CreditCard'];
+        if (!name || typeof name !== 'string' || name.trim().length === 0) {
+            return NextResponse.json({ error: 'Name is required' }, { status: 400 });
+        }
+        if (name.trim().length > 50) {
+            return NextResponse.json({ error: 'Name is too long (max 50 characters)' }, { status: 400 });
+        }
+        if (!type || !VALID_TYPES.includes(type)) {
+            return NextResponse.json({ error: 'Type must be Bank or CreditCard' }, { status: 400 });
         }
 
         const result = await sql`
             INSERT INTO accounts (user_id, name, type)
-            VALUES (${session.userId}, ${name}, ${type})
+            VALUES (${session.userId}, ${name.trim()}, ${type})
             RETURNING id, name, type
         `;
 

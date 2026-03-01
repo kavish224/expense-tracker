@@ -81,6 +81,11 @@ export default function ExportCSVButton() {
             return;
         }
 
+        if (range === 'custom_range' && fromDate && toDate && fromDate > toDate) {
+            showToast('Start date must be before end date', 'error');
+            return;
+        }
+
         const filtered = filterExpensesByRange(range, fromDate, toDate);
         setIsOpen(false);
         setShowDatePicker(false);

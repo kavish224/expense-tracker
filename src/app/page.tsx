@@ -12,6 +12,7 @@ import { CATEGORY_COLORS } from '@/lib/types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useMemo, useState, useCallback } from 'react';
 import { useToast } from '@/components/Toast';
+import LoadingSpinner from '@/components/LoadingSpinner';
 
 const CATEGORY_EMOJI: Record<string, string> = {
   Food: '🍜', Transport: '🚗', Shopping: '🛍️', Entertainment: '🎬',
@@ -21,6 +22,7 @@ const CATEGORY_EMOJI: Record<string, string> = {
 
 export default function Dashboard() {
   const expenses = useExpenseStore((s) => s.expenses);
+  const loading = useExpenseStore((s) => s.loading);
   const deleteExpense = useExpenseStore((s) => s.deleteExpense);
   const openEditModal = useExpenseStore((s) => s.openEditModal);
   const { showToast } = useToast();
@@ -57,6 +59,14 @@ export default function Dashboard() {
 
   const now = new Date();
   const monthName = now.toLocaleDateString('en-IN', { month: 'long' });
+
+  if (loading.initial) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
 
   return (
     <main className="mx-auto max-w-lg px-4 pt-5 pb-8 space-y-6">

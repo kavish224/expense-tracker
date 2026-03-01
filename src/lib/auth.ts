@@ -2,6 +2,9 @@ import { cookies } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 
+if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
+    throw new Error('SESSION_SECRET environment variable is required in production');
+}
 const SESSION_SECRET = process.env.SESSION_SECRET || 'super-secret-fallback-key-for-development';
 const key = new TextEncoder().encode(SESSION_SECRET);
 

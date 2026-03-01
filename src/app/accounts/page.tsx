@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useExpenseStore } from '@/store/useExpenseStore';
 import { useToast } from '@/components/Toast';
+import LoadingSpinner from '@/components/LoadingSpinner';
 import {
     getAccountTotals,
     formatCurrency,
@@ -10,7 +11,11 @@ import {
 import { Account } from '@/lib/types';
 
 export default function Accounts() {
-    const { expenses, accounts, addAccount, deleteAccount } = useExpenseStore();
+    const { expenses, accounts, addAccount, deleteAccount, loading } = useExpenseStore();
+
+    if (loading.initial) {
+        return <div className="flex items-center justify-center h-full"><LoadingSpinner size="lg" /></div>;
+    }
     const { showToast } = useToast();
 
     const [newName, setNewName] = useState('');

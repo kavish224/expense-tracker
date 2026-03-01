@@ -8,6 +8,7 @@ import {
 import { CATEGORY_COLORS } from '@/lib/types';
 import { useMemo, useState } from 'react';
 import ExportCSVButton from '@/components/ExportCSVButton';
+import LoadingSpinner from '@/components/LoadingSpinner';
 
 const CATEGORY_EMOJI: Record<string, string> = {
     Food: '🍜', Transport: '🚗', Shopping: '🛍️', Entertainment: '🎬',
@@ -16,7 +17,11 @@ const CATEGORY_EMOJI: Record<string, string> = {
 };
 
 export default function Analytics() {
-    const { expenses, accounts, openEditModal } = useExpenseStore();
+    const { expenses, accounts, openEditModal, loading } = useExpenseStore();
+
+    if (loading.initial) {
+        return <div className="flex items-center justify-center h-full"><LoadingSpinner size="lg" /></div>;
+    }
 
     const [searchTerm, setSearchTerm] = useState('');
     const [filterCategory, setFilterCategory] = useState<string>('All');
