@@ -62,7 +62,7 @@ export default function RootLayout({
                 right: 0,
                 bottom: 0,
                 paddingTop: 'calc(env(safe-area-inset-top) + 44px)',
-                paddingBottom: 'calc(env(safe-area-inset-bottom) + 49px)',
+                paddingBottom: 'calc(env(safe-area-inset-bottom, 34px) + 49px)',
               }}
             >
               {children}

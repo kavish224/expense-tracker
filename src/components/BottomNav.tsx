@@ -50,12 +50,15 @@ export default function BottomNav() {
 
     return (
         <nav
-            className="fixed bottom-0 left-0 right-0 z-30 border-t border-(--color-separator)"
+            className="fixed left-0 right-0 z-30 border-t border-(--color-separator)"
             style={{
+                bottom: 0,
                 background: 'var(--color-nav-bg)',
                 backdropFilter: 'blur(20px)',
                 WebkitBackdropFilter: 'blur(20px)',
-                paddingBottom: 'env(safe-area-inset-bottom)',
+                /* Extend background visually below bottom:0 to cover home indicator.
+                   paddingBottom pushes content up; the nav background fills the rest. */
+                paddingBottom: 'env(safe-area-inset-bottom, 34px)',
             }}
         >
             <div className="mx-auto grid max-w-lg grid-cols-4 items-center h-[49px]">
