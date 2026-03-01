@@ -84,12 +84,11 @@ html {
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  /* The area below the safe-area (home indicator zone) is painted by html.
-     Use OPAQUE colors that match the nav visually — semi-transparent vars
-     render darker on html since there's nothing behind to blend with. */
+  /* Fill the entire screen including below safe-area with nav-matching color.
+     This paints the home-indicator zone so there's no black gap. */
   background-color: #ffffff;
+  min-height: 100%;
 }
-.dark html,
 html.dark {
   background-color: #1c1c1e;
 }
@@ -98,12 +97,18 @@ body {
   font-family: var(--font-family);
   font-size: 15px;
   line-height: 1.4;
-  background-color: var(--color-bg);
+  /* IMPORTANT: body bg must also match nav in the safe-area zone.
+     Since all content is position:fixed, body has no height —
+     html bg shows through. But just in case, match it here too. */
+  background-color: #ffffff;
   color: var(--color-text-primary);
   overscroll-behavior: none;
   -webkit-touch-callout: none;
-  /* Only transition bg/color on theme switch, not on every frame */
+  min-height: 100%;
   transition: background-color 0.2s ease, color 0.2s ease;
+}
+.dark body {
+  background-color: #1c1c1e;
 }
 
 /* Scroll container — iOS rubber-band momentum */

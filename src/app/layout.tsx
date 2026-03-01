@@ -46,7 +46,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className="font-sans antialiased bg-(--color-bg) text-(--color-text-primary)"
+        className="font-sans antialiased text-(--color-text-primary)"
       >
         <ThemeProvider>
           <ToastProvider>
@@ -56,7 +56,7 @@ export default function RootLayout({
             {/* Scroll area: sits between fixed header and fixed nav */}
             <div
               id="scroll-container"
-              className="overflow-y-auto overscroll-none"
+              className="overflow-y-auto overscroll-none bg-(--color-bg)"
               style={{
                 position: 'fixed',
                 top: 0,
