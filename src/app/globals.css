@@ -96,11 +96,12 @@ body {
   font-family: var(--font-family);
   font-size: 15px;
   line-height: 1.4;
-  background-color: var(--color-bg);
+  /* No background-color here — html handles it so the home-indicator zone
+     matches the nav. The scroll container sets bg-(--color-bg) for content. */
   color: var(--color-text-primary);
   overscroll-behavior: none;
   -webkit-touch-callout: none;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: color 0.2s ease;
 }
 
 /* Scroll container — iOS rubber-band momentum */
