@@ -10,238 +10,210 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ── Zerodha kavish Design Tokens ─────────────────────────── */
+/* ── iOS-native Design Tokens ─────────────────────────────── */
 :root {
-  /* Light mode */
-  --color-bg: #f8f8f8;
-  --color-surface: #ffffff;
-  --color-surface2: #f1f3f6;
-  --color-border: #e0e0e0;
-  --color-border2: #eeeeee;
+  /* Light mode — matches iOS system background */
+  --color-bg:        #f2f2f7;   /* iOS systemGroupedBackground */
+  --color-surface:   #ffffff;   /* iOS secondarySystemGroupedBackground */
+  --color-surface2:  #f2f2f7;
+  --color-surface3:  #e5e5ea;
+  --color-border:    rgba(60,60,67,0.12);
+  --color-border2:   rgba(60,60,67,0.08);
+  --color-separator: rgba(60,60,67,0.15);
 
-  --color-text-primary: #444444;
-  --color-text-secondary: #999999;
-  --color-text-muted: #bbb;
+  --color-text-primary:   #000000;
+  --color-text-secondary: #6c6c70; /* iOS secondaryLabel */
+  --color-text-muted:     #aeaeb2; /* iOS tertiaryLabel */
+  --color-text-quaternary: #c7c7cc;
 
-  --color-accent: #e05d4b;
-  /* kavish orange-red */
-  --color-accent-hover: #cc4a38;
+  --color-accent:       #ff5722;
+  --color-accent-hover: #e04e1f;
 
-  --color-green: #4caf50;
-  --color-red: #df514c;
+  --color-green:  #34c759; /* iOS systemGreen */
+  --color-red:    #ff3b30; /* iOS systemRed */
+  --color-blue:   #007aff; /* iOS systemBlue */
 
-  --color-nav-bg: #ffffff;
-  --color-nav-border: #e8e8e8;
+  --color-nav-bg:     rgba(255,255,255,0.85);
+  --color-nav-border: rgba(60,60,67,0.15);
 
-  --font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  /* iOS-style border radii */
+  --radius-sm:  8px;
+  --radius-md:  12px;
+  --radius-lg:  16px;
+  --radius-xl:  20px;
+  --radius-2xl: 24px;
+
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
 }
 
 .dark {
-  --color-bg: #151515;
-  --color-surface: #1b1b1b;
-  --color-surface2: #222222;
-  --color-border: #282828;
-  --color-border2: #212121;
+  /* Dark mode — matches iOS dark system background */
+  --color-bg:        #000000;   /* iOS systemGroupedBackground dark */
+  --color-surface:   #1c1c1e;   /* iOS secondarySystemGroupedBackground dark */
+  --color-surface2:  #2c2c2e;   /* iOS tertiarySystemBackground dark */
+  --color-surface3:  #3a3a3c;
+  --color-border:    rgba(255,255,255,0.08);
+  --color-border2:   rgba(255,255,255,0.05);
+  --color-separator: rgba(255,255,255,0.10);
 
-  --color-text-primary: #aaaaaa;
-  --color-text-secondary: #666666;
-  --color-text-muted: #444444;
+  --color-text-primary:    #ffffff;
+  --color-text-secondary:  #ebebf5cc; /* iOS secondaryLabel dark */
+  --color-text-muted:      #ebebf599; /* iOS tertiaryLabel dark */
+  --color-text-quaternary: #ebebf54d;
 
-  --color-accent: #e05d4b;
-  --color-accent-hover: #cc4a38;
+  --color-accent:       #ff5722;
+  --color-accent-hover: #ff6b3d;
 
-  --color-green: #5b9a5d;
-  --color-red: #e25f5b;
+  --color-green:  #30d158;
+  --color-red:    #ff453a;
+  --color-blue:   #0a84ff;
 
-  --color-nav-bg: #1b1b1b;
-  --color-nav-border: #282828;
+  --color-nav-bg:     rgba(28,28,30,0.92);
+  --color-nav-border: rgba(255,255,255,0.08);
 }
 
-/* ── Base Styles ─────────────────────────────────────────── */
-* {
-  -webkit-tap-highlight-color: transparent;
+/* ── Base Reset ──────────────────────────────────────────── */
+*, *::before, *::after {
   box-sizing: border-box;
+  /* Kill the grey tap flash on iOS */
+  -webkit-tap-highlight-color: transparent;
 }
 
 html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Prevent iOS text size adjustment on orientation change */
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
 
 body {
   font-family: var(--font-family);
-  font-size: 13px;
+  font-size: 15px;
+  line-height: 1.4;
   background-color: var(--color-bg);
   color: var(--color-text-primary);
   overscroll-behavior: none;
-  /* Faster theme transitions */
-  transition: background-color 0.15s, color 0.15s;
-  /* Prevent callout on long press */
   -webkit-touch-callout: none;
+  /* Only transition bg/color on theme switch, not on every frame */
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Scroll container: iOS momentum + GPU compositor layer */
+/* Scroll container — iOS rubber-band momentum */
 #scroll-container {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
   transform: translateZ(0);
-  will-change: scroll-position;
 }
 
-/* Eliminate the 300ms iOS tap delay on all interactive elements.
-   This makes every tap feel instant — equivalent to native app response. */
-a, button, [role="button"] {
+/* Eliminate 300ms tap delay globally */
+a, button, [role="button"], input, select, textarea {
   touch-action: manipulation;
 }
 
 /* ── iOS Safe Area ───────────────────────────────────────── */
-.safe-top {
-  padding-top: env(safe-area-inset-top);
+.safe-top        { padding-top:    env(safe-area-inset-top); }
+.safe-bottom     { padding-bottom: env(safe-area-inset-bottom); }
+.safe-bottom-plus { padding-bottom: calc(env(safe-area-inset-bottom) + 0.75rem); }
+.safe-left       { padding-left:   env(safe-area-inset-left); }
+.safe-right      { padding-right:  env(safe-area-inset-right); }
+.pb-safe         { padding-bottom: max(1rem, calc(env(safe-area-inset-bottom) + 8px)); }
+
+/* ── Spring slide-up animation (iOS modal entrance) ─────── */
+@keyframes ios-slide-up {
+  from { transform: translateY(100%); opacity: 0.6; }
+  to   { transform: translateY(0);   opacity: 1; }
 }
-
-.safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-.safe-bottom-plus {
-  padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
-}
-
-.safe-left {
-  padding-left: env(safe-area-inset-left);
-}
-
-.safe-right {
-  padding-right: env(safe-area-inset-right);
-}
-
-.pb-safe {
-  padding-bottom: max(1.5rem, calc(env(safe-area-inset-bottom) + 12px));
-}
-
-/* ── kavish-style bottom sheet animation ───────────────────── */
-@keyframes kavish-slide-up {
-  from {
-    transform: translateY(100%);
-  }
-
-  to {
-    transform: translateY(0);
-  }
-}
-
 .kavish-slide-up {
-  animation: kavish-slide-up 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: ios-slide-up 0.32s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-/* ── Number inputs ───────────────────────────────────────── */
+/* ── Fade-in for filter drawer ───────────────────────────── */
+@keyframes ios-fade-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ios-fade-in {
+  animation: ios-fade-in 0.2s ease-out;
+}
+
+/* ── Number inputs — no spinners ─────────────────────────── */
 input[type='number']::-webkit-inner-spin-button,
 input[type='number']::-webkit-outer-spin-button {
   -webkit-appearance: none;
   appearance: none;
   margin: 0;
 }
-
 input[type='number'] {
   -moz-appearance: textfield;
   appearance: textfield;
 }
 
-/* ── kavish scrollbar ──────────────────────────────────────── */
-::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
+/* ── Invisible scrollbar (iOS-native feel) ───────────────── */
+::-webkit-scrollbar { display: none; }
+* { scrollbar-width: none; }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: 2px;
-}
-
-/* ── kavish chip / tag ─────────────────────────────────────── */
+/* ── iOS-style Chip / Pill tag ───────────────────────────── */
 .kavish-chip {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
-  border-radius: 4px;
-  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
   font-weight: 500;
-  border: 1px solid var(--color-border);
+  border: 1.5px solid var(--color-border);
   background: var(--color-surface);
   color: var(--color-text-secondary);
   cursor: pointer;
-  /* Snappier on touch — 80ms feels instant */
-  transition: all 0.08s ease-out;
+  transition: transform 0.1s ease, opacity 0.1s ease;
   user-select: none;
-  /* Prevent text selection on double-tap */
   -webkit-user-select: none;
 }
-
-.kavish-chip:active,
-.kavish-chip:focus-visible {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+.kavish-chip:active {
   transform: scale(0.94);
+  opacity: 0.7;
 }
-
 .kavish-chip.active {
   background: var(--color-accent);
   border-color: var(--color-accent);
   color: #fff;
+  font-weight: 600;
 }
 
-/* ── kavish table-row expense item ─────────────────────────── */
+/* ── iOS grouped list row ────────────────────────────────── */
 .kavish-row {
   display: flex;
   align-items: center;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--color-border2);
-  font-size: 13px;
-  transition: background 0.08s ease-out, transform 0.08s ease-out;
+  padding: 12px 16px;
+  border-bottom: 0.5px solid var(--color-separator);
+  font-size: 15px;
   cursor: default;
+  transition: background 0.1s ease;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.kavish-row:last-child { border-bottom: none; }
+.kavish-row:active     { background: var(--color-surface2); }
+
+/* ── iOS grouped card (inset, large radius) ──────────────── */
+.kavish-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  /* Subtle card shadow like iOS */
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 1px rgba(0,0,0,0.02);
 }
 
-.kavish-row:last-child {
-  border-bottom: none;
-}
-
-.kavish-row:active {
-  background: var(--color-surface2);
-  transform: scale(0.985);
-}
-
-/* ── Focus indicators for keyboard navigation ───────────────────── */
+/* ── Focus ring (keyboard nav) ───────────────────────────── */
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 3px solid var(--color-accent);
   outline-offset: 2px;
-}
-
-*:focus:not(:focus-visible) {
-  outline: none;
-}
-
-/* ── kavish card ───────────────────────────────────────────── */
-.kavish-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
   border-radius: 4px;
 }
+*:focus:not(:focus-visible) { outline: none; }
 
-/* ── Number color helpers ────────────────────────────────── */
-.kavish-green {
-  color: var(--color-green);
-}
-
-.kavish-red {
-  color: var(--color-red);
-}
+/* ── Color helpers ───────────────────────────────────────── */
+.kavish-green { color: var(--color-green); }
+.kavish-red   { color: var(--color-red); }

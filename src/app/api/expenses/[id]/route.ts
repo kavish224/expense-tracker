@@ -46,9 +46,27 @@ export async function PUT(
         const body = await request.json();
         const { amount, category, paymentMethod, account, date, note } = body;
 
-        let parsedAmount = Number(amount);
-        if (isNaN(parsedAmount)) {
-            return NextResponse.json({ error: 'Amount must be a number' }, { status: 400 });
+        const parsedAmount = Number(amount);
+        if (!isFinite(parsedAmount) || parsedAmount <= 0) {
+            return NextResponse.json({ error: 'Amount must be a positive number' }, { status: 400 });
+        }
+        if (parsedAmount > 10_000_000) {
+            return NextResponse.json({ error: 'Amount exceeds maximum allowed value' }, { status: 400 });
+        }
+
+        const VALID_CATEGORIES = ['Food','Transport','Shopping','Entertainment','Bills','Health','Education','Travel','Groceries','Other'];
+        const VALID_PAYMENT_METHODS = ['Cash','UPI','Credit Card','Debit Card','Net Banking','Wallet'];
+        if (!category || !VALID_CATEGORIES.includes(category)) {
+            return NextResponse.json({ error: 'Invalid category' }, { status: 400 });
+        }
+        if (!paymentMethod || !VALID_PAYMENT_METHODS.includes(paymentMethod)) {
+            return NextResponse.json({ error: 'Invalid payment method' }, { status: 400 });
+        }
+        if (!date || isNaN(Date.parse(date))) {
+            return NextResponse.json({ error: 'Invalid date' }, { status: 400 });
+        }
+        if (note && typeof note === 'string' && note.length > 200) {
+            return NextResponse.json({ error: 'Note is too long (max 200 characters)' }, { status: 400 });
         }
 
         const result = await sql`

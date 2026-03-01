@@ -1,18 +1,20 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useExpenseStore } from '@/store/useExpenseStore';
 
 export default function StoreInitializer() {
     const initializeData = useExpenseStore((s) => s.initializeData);
     const loading = useExpenseStore((s) => s.loading);
-    const expenses = useExpenseStore((s) => s.expenses);
     const setUser = useExpenseStore((s) => s.setUser);
     const user = useExpenseStore((s) => s.user);
 
     const router = useRouter();
     const pathname = usePathname();
+    // Use a ref so initialization runs exactly once per authenticated session,
+    // not re-triggered by expenses.length changes (which breaks after deleting all).
+    const hasInitialized = useRef(false);
 
     useEffect(() => {
         const initAuth = async () => {
@@ -26,27 +28,26 @@ export default function StoreInitializer() {
                     }
                 } else {
                     setUser(null);
+                    hasInitialized.current = false; // reset on logout
                     if (pathname !== '/login' && pathname !== '/signup') {
                         router.replace('/login');
                     }
                 }
             } catch (err) {
-                console.error("Failed to verify session", err);
+                console.error('Failed to verify session', err);
             }
         };
 
         initAuth();
-    }, [pathname, router, setUser]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pathname]);
 
     useEffect(() => {
-        if (user && !loading.initial && expenses.length === 0) {
+        if (user && !loading.initial && !hasInitialized.current) {
+            hasInitialized.current = true;
             initializeData();
         }
-    }, [user, loading.initial, expenses.length, initializeData]);
-
-    useEffect(() => {
-        console.log(`📱 App Version: ${process.env.NEXT_PUBLIC_APP_VERSION}`);
-    }, []);
+    }, [user, loading.initial, initializeData]);
 
     return null;
 }

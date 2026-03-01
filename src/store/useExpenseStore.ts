@@ -72,31 +72,65 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
                 loading: { ...get().loading, expenses: false },
                 errors: { ...get().errors, expenses: (error as Error).message }
             });
+            throw error;
         }
     },
 
     addExpense: async (data) => {
-        const newExpense = await addExpenseToDB(data);
+        // Optimistic insert with a temp id so UI responds immediately
+        const tempId = `temp-${Date.now()}`;
+        const optimistic: Expense = { id: tempId, ...data };
         set({
-            expenses: [newExpense, ...get().expenses].sort(
+            expenses: [optimistic, ...get().expenses].sort(
                 (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
             )
         });
+        try {
+            const newExpense = await addExpenseToDB(data);
+            // Replace temp with real record
+            set({
+                expenses: get().expenses
+                    .map(e => e.id === tempId ? newExpense : e)
+                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            });
+        } catch (error) {
+            // Rollback on failure
+            set({ expenses: get().expenses.filter(e => e.id !== tempId) });
+            throw error;
+        }
     },
 
     updateExpense: async (id, data) => {
-        const updatedExpense = await updateExpenseInDB(id, data);
+        // Snapshot for rollback
+        const prev = get().expenses;
         set({
-            expenses: get().expenses.map((e) => (e.id === id ? updatedExpense : e)).sort(
-                (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-            ),
+            expenses: prev
+                .map(e => e.id === id ? { ...e, ...data } : e)
+                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         });
+        try {
+            const updated = await updateExpenseInDB(id, data);
+            set({
+                expenses: get().expenses
+                    .map(e => e.id === id ? updated : e)
+                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            });
+        } catch (error) {
+            set({ expenses: prev });
+            throw error;
+        }
     },
 
     deleteExpense: async (id) => {
-        await deleteExpenseFromDB(id);
-        const filtered = get().expenses.filter((e) => e.id !== id);
-        set({ expenses: filtered });
+        // Optimistic remove
+        const prev = get().expenses;
+        set({ expenses: prev.filter(e => e.id !== id) });
+        try {
+            await deleteExpenseFromDB(id);
+        } catch (error) {
+            set({ expenses: prev });
+            throw error;
+        }
     },
 
     loadAccounts: async () => {
@@ -109,6 +143,7 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
                 loading: { ...get().loading, accounts: false },
                 errors: { ...get().errors, accounts: (error as Error).message }
             });
+            throw error;
         }
     },
 
@@ -118,8 +153,14 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
     },
 
     deleteAccount: async (id) => {
-        await deleteAccountFromDB(id);
-        set({ accounts: get().accounts.filter((a) => a.id !== id) });
+        const prev = get().accounts;
+        set({ accounts: prev.filter(a => a.id !== id) });
+        try {
+            await deleteAccountFromDB(id);
+        } catch (error) {
+            set({ accounts: prev });
+            throw error;
+        }
     },
 
     initializeData: async () => {
