@@ -46,19 +46,31 @@ export default function RootLayout({
         />
       </head>
       <body
-        className="font-sans antialiased bg-(--color-bg) text-(--color-text-primary) overflow-hidden"
-        style={{ height: '100svh' }}
+        className="font-sans antialiased bg-(--color-bg) text-(--color-text-primary)"
       >
         <ThemeProvider>
           <ToastProvider>
             <StoreInitializer />
-            <div className="flex flex-col" style={{ height: '100svh' }}>
-              <Header />
-              <div id="scroll-container" className="flex-1 overflow-y-auto overscroll-none">
-                {children}
-              </div>
-              <BottomNav />
+            {/* Header: fixed at top, respects safe-area-inset-top */}
+            <Header />
+            {/* Scroll area: sits between fixed header and fixed nav */}
+            <div
+              id="scroll-container"
+              className="overflow-y-auto overscroll-none"
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                paddingTop: 'calc(env(safe-area-inset-top) + 44px)',
+                paddingBottom: 'calc(env(safe-area-inset-bottom) + 49px)',
+              }}
+            >
+              {children}
             </div>
+            {/* Nav: fixed at bottom, fills safe area below */}
+            <BottomNav />
             <AddExpenseModal />
           </ToastProvider>
         </ThemeProvider>

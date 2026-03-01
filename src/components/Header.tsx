@@ -12,8 +12,13 @@ export default function Header() {
 
     return (
         <header
-            className="shrink-0 safe-top z-30 border-b border-[var(--color-separator)]"
-            style={{ background: 'var(--color-nav-bg)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}
+            className="fixed top-0 left-0 right-0 z-30 border-b border-(--color-separator)"
+            style={{
+                background: 'var(--color-nav-bg)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                paddingTop: 'env(safe-area-inset-top)',
+            }}
         >
             <div className="mx-auto flex max-w-lg items-center justify-between px-4 h-11">
                 <h1 className="text-[17px] font-semibold text-(--color-text-primary) tracking-tight">

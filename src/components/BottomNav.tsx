@@ -50,8 +50,13 @@ export default function BottomNav() {
 
     return (
         <nav
-            className="shrink-0 border-t border-(--color-separator)"
-            style={{ background: 'var(--color-nav-bg)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}
+            className="fixed bottom-0 left-0 right-0 z-30 border-t border-(--color-separator)"
+            style={{
+                background: 'var(--color-nav-bg)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                paddingBottom: 'env(safe-area-inset-bottom)',
+            }}
         >
             <div className="mx-auto grid max-w-lg grid-cols-4 items-center h-[49px]">
 
