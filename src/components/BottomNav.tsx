@@ -50,19 +50,9 @@ export default function BottomNav() {
 
     return (
         <nav
-            className="shrink-0 border-t border-(--color-separator) relative"
-            style={{
-                background: 'var(--color-nav-bg)',
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                paddingBottom: 'env(safe-area-inset-bottom)',
-            }}
+            className="shrink-0 border-t border-(--color-separator)"
+            style={{ background: 'var(--color-nav-bg)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}
         >
-            {/* Paint the home-indicator zone with the nav background — prevents black gap */}
-            <div
-                className="absolute bottom-0 left-0 right-0 -z-10"
-                style={{ height: 'env(safe-area-inset-bottom)', background: 'var(--color-nav-bg)' }}
-            />
             <div className="mx-auto grid max-w-lg grid-cols-4 items-center h-[49px]">
 
                 {navItems.map((item) => {

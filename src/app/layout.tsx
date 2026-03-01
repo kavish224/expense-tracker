@@ -46,12 +46,13 @@ export default function RootLayout({
         />
       </head>
       <body
-        className="font-sans antialiased bg-(--color-bg) text-(--color-text-primary) h-dvh overflow-hidden"
+        className="font-sans antialiased bg-(--color-bg) text-(--color-text-primary) overflow-hidden"
+        style={{ height: '100svh' }}
       >
         <ThemeProvider>
           <ToastProvider>
             <StoreInitializer />
-            <div className="flex flex-col h-dvh">
+            <div className="flex flex-col" style={{ height: '100svh' }}>
               <Header />
               <div id="scroll-container" className="flex-1 overflow-y-auto overscroll-none">
                 {children}
