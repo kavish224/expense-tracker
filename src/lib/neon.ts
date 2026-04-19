@@ -12,7 +12,7 @@ const sqlClient = neon(databaseUrl);
 
 // Create a wrapper function that mirrors the @vercel/postgres signature exactly
 // @vercel/postgres returns { rows: any[], rowCount: number }
-export const sql = async (strings: TemplateStringsArray, ...values: any[]) => {
+export const sql = async (strings: TemplateStringsArray, ...values: unknown[]) => {
     const res = await sqlClient(strings, ...values);
 
     // By default, the Neon HTTP client just returns an Array of rows.

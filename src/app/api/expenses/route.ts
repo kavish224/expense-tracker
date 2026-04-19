@@ -1,6 +1,36 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/neon';
 import { verifySession } from '@/lib/auth';
+import { NormalizedExpenseInput, validateBulkExpenseInput, validateExpenseInput } from '@/lib/expenseValidation';
+
+function mapExpenseRow(row: Record<string, unknown>) {
+    return {
+        id: row.id as string,
+        amount: Number(row.amount),
+        category: row.category as string,
+        paymentMethod: row.paymentMethod as string,
+        account: row.account_id as string | undefined,
+        accountName: row.account_name as string | undefined,
+        date: new Date(row.date as string).toISOString(),
+        note: row.note as string | null,
+    };
+}
+
+async function insertExpense(userId: string, expense: NormalizedExpenseInput) {
+    const result = await sql`
+        WITH inserted AS (
+            INSERT INTO expenses (user_id, amount, category, payment_method, account_id, date, note)
+            VALUES (${userId}, ${expense.amount}, ${expense.category}, ${expense.paymentMethod}, ${expense.account}, ${expense.date}, ${expense.note})
+            RETURNING id, amount, category, payment_method, account_id, date, note
+        )
+        SELECT i.id, i.amount, i.category, i.payment_method as "paymentMethod", i.account_id, i.date, i.note,
+               a.name as account_name
+        FROM inserted i
+        LEFT JOIN accounts a ON i.account_id = a.id
+    `;
+
+    return mapExpenseRow(result.rows[0]);
+}
 
 export async function GET() {
     try {
@@ -19,16 +49,7 @@ export async function GET() {
         `;
 
         // Map account_id -> account string to match existing Expense type
-        const expenses = result.rows.map(row => ({
-            id: row.id,
-            amount: Number(row.amount),
-            category: row.category,
-            paymentMethod: row.paymentMethod,
-            account: row.account_id, // holds UUID
-            accountName: row.account_name, // holds Name
-            date: new Date(row.date).toISOString(),
-            note: row.note,
-        }));
+        const expenses = result.rows.map((row) => mapExpenseRow(row));
 
         return NextResponse.json(expenses);
     } catch (error) {
@@ -45,55 +66,26 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { amount, category, paymentMethod, account, date, note } = body;
+        if (Array.isArray(body?.expenses)) {
+            const bulkValidation = validateBulkExpenseInput(body.expenses);
+            if (!bulkValidation.ok) {
+                return NextResponse.json({ error: bulkValidation.error }, { status: 400 });
+            }
 
-        const parsedAmount = Number(amount);
-        if (!isFinite(parsedAmount) || parsedAmount <= 0) {
-            return NextResponse.json({ error: 'Amount must be a positive number' }, { status: 400 });
-        }
-        if (parsedAmount > 10_000_000) {
-            return NextResponse.json({ error: 'Amount exceeds maximum allowed value' }, { status: 400 });
-        }
+            const createdExpenses = [];
+            for (const expense of bulkValidation.value) {
+                createdExpenses.push(await insertExpense(session.userId, expense));
+            }
 
-        const VALID_CATEGORIES = ['Food','Transport','Shopping','Entertainment','Bills','Health','Education','Travel','Groceries','Other'];
-        const VALID_PAYMENT_METHODS = ['Cash','UPI','Credit Card','Debit Card','Net Banking','Wallet'];
-        if (!category || !VALID_CATEGORIES.includes(category)) {
-            return NextResponse.json({ error: 'Invalid category' }, { status: 400 });
-        }
-        if (!paymentMethod || !VALID_PAYMENT_METHODS.includes(paymentMethod)) {
-            return NextResponse.json({ error: 'Invalid payment method' }, { status: 400 });
-        }
-        if (!date || isNaN(Date.parse(date))) {
-            return NextResponse.json({ error: 'Invalid date' }, { status: 400 });
-        }
-        if (note && typeof note === 'string' && note.length > 200) {
-            return NextResponse.json({ error: 'Note is too long (max 200 characters)' }, { status: 400 });
+            return NextResponse.json(createdExpenses, { status: 201 });
         }
 
-        const result = await sql`
-            WITH inserted AS (
-                INSERT INTO expenses (user_id, amount, category, payment_method, account_id, date, note)
-                VALUES (${session.userId}, ${parsedAmount}, ${category}, ${paymentMethod}, ${account || null}, ${date}, ${note || null})
-                RETURNING id, amount, category, payment_method, account_id, date, note
-            )
-            SELECT i.id, i.amount, i.category, i.payment_method as "paymentMethod", i.account_id, i.date, i.note,
-                   a.name as account_name
-            FROM inserted i
-            LEFT JOIN accounts a ON i.account_id = a.id
-        `;
+        const validation = validateExpenseInput(body);
+        if (!validation.ok) {
+            return NextResponse.json({ error: validation.error }, { status: 400 });
+        }
 
-        const row = result.rows[0];
-        const newExpense = {
-            id: row.id,
-            amount: Number(row.amount),
-            category: row.category,
-            paymentMethod: row.paymentMethod,
-            account: row.account_id,
-            accountName: row.account_name,
-            date: new Date(row.date).toISOString(),
-            note: row.note,
-        };
-
+        const newExpense = await insertExpense(session.userId, validation.value);
         return NextResponse.json(newExpense, { status: 201 });
     } catch (error) {
         console.error('Failed to create expense:', error);

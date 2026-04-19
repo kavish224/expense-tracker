@@ -1,14 +1,24 @@
-import { Expense, Account } from './types';
+import { Expense, Account, ExpenseInput } from './types';
 
 // ================= Expenses =================
 
-export async function addExpenseToDB(expense: Omit<Expense, 'id'>): Promise<Expense> {
+export async function addExpenseToDB(expense: ExpenseInput): Promise<Expense> {
     const res = await fetch('/api/expenses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(expense),
     });
     if (!res.ok) throw new Error('Failed to add expense');
+    return res.json();
+}
+
+export async function addExpensesBulkToDB(expenses: ExpenseInput[]): Promise<Expense[]> {
+    const res = await fetch('/api/expenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expenses }),
+    });
+    if (!res.ok) throw new Error('Failed to add expenses');
     return res.json();
 }
 

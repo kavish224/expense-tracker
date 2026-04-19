@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/neon';
 import { verifySession } from '@/lib/auth';
+import { validateExpenseInput } from '@/lib/expenseValidation';
 
 export async function DELETE(
     request: Request,
@@ -44,40 +45,21 @@ export async function PUT(
 
         const { id } = await params;
         const body = await request.json();
-        const { amount, category, paymentMethod, account, date, note } = body;
-
-        const parsedAmount = Number(amount);
-        if (!isFinite(parsedAmount) || parsedAmount <= 0) {
-            return NextResponse.json({ error: 'Amount must be a positive number' }, { status: 400 });
-        }
-        if (parsedAmount > 10_000_000) {
-            return NextResponse.json({ error: 'Amount exceeds maximum allowed value' }, { status: 400 });
+        const validation = validateExpenseInput(body);
+        if (!validation.ok) {
+            return NextResponse.json({ error: validation.error }, { status: 400 });
         }
 
-        const VALID_CATEGORIES = ['Food','Transport','Shopping','Entertainment','Bills','Health','Education','Travel','Groceries','Other'];
-        const VALID_PAYMENT_METHODS = ['Cash','UPI','Credit Card','Debit Card','Net Banking','Wallet'];
-        if (!category || !VALID_CATEGORIES.includes(category)) {
-            return NextResponse.json({ error: 'Invalid category' }, { status: 400 });
-        }
-        if (!paymentMethod || !VALID_PAYMENT_METHODS.includes(paymentMethod)) {
-            return NextResponse.json({ error: 'Invalid payment method' }, { status: 400 });
-        }
-        if (!date || isNaN(Date.parse(date))) {
-            return NextResponse.json({ error: 'Invalid date' }, { status: 400 });
-        }
-        if (note && typeof note === 'string' && note.length > 200) {
-            return NextResponse.json({ error: 'Note is too long (max 200 characters)' }, { status: 400 });
-        }
-
+        const { amount, category, paymentMethod, account, date, note } = validation.value;
         const result = await sql`
             WITH updated AS (
                 UPDATE expenses
-                SET amount = ${parsedAmount},
+                SET amount = ${amount},
                     category = ${category},
                     payment_method = ${paymentMethod},
-                    account_id = ${account || null},
+                    account_id = ${account},
                     date = ${date},
-                    note = ${note || null}
+                    note = ${note}
                 WHERE id = ${id} AND user_id = ${session.userId}
                 RETURNING id, amount, category, payment_method, account_id, date, note
             )

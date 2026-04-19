@@ -1,9 +1,10 @@
 'use client';
 
 import { create } from 'zustand';
-import { Expense, Account } from '@/lib/types';
+import { Expense, Account, ExpenseInput } from '@/lib/types';
 import {
     addExpenseToDB,
+    addExpensesBulkToDB,
     updateExpenseInDB,
     getAllExpenses,
     deleteExpenseFromDB,
@@ -34,7 +35,8 @@ interface ExpenseStore {
     editingExpense: Expense | null;
     setUser: (user: User | null) => void;
     loadExpenses: () => Promise<void>;
-    addExpense: (data: Omit<Expense, 'id'>) => Promise<void>;
+    addExpense: (data: ExpenseInput) => Promise<void>;
+    addExpensesBulk: (items: ExpenseInput[]) => Promise<void>;
     updateExpense: (id: string, data: Partial<Expense>) => Promise<void>;
     deleteExpense: (id: string) => Promise<void>;
     loadAccounts: () => Promise<void>;
@@ -45,6 +47,10 @@ interface ExpenseStore {
     openEditModal: (expense: Expense) => void;
     closeModal: () => void;
 }
+
+const sortExpensesByDateDesc = (expenses: Expense[]) => (
+    [...expenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+);
 
 export const useExpenseStore = create<ExpenseStore>((set, get) => ({
     expenses: [],
@@ -62,9 +68,7 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
         try {
             const expenses = await getAllExpenses();
             set({
-                expenses: expenses.sort(
-                    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-                ),
+                expenses: sortExpensesByDateDesc(expenses),
                 loading: { ...get().loading, expenses: false }
             });
         } catch (error) {
@@ -79,19 +83,21 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
     addExpense: async (data) => {
         // Optimistic insert with a temp id so UI responds immediately
         const tempId = `temp-${Date.now()}`;
-        const optimistic: Expense = { id: tempId, ...data };
+        const optimistic: Expense = {
+            id: tempId,
+            ...data,
+            accountName: data.account ? get().accounts.find((account) => account.id === data.account)?.name : undefined,
+        };
         set({
-            expenses: [optimistic, ...get().expenses].sort(
-                (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-            )
+            expenses: sortExpensesByDateDesc([optimistic, ...get().expenses])
         });
         try {
             const newExpense = await addExpenseToDB(data);
             // Replace temp with real record
             set({
-                expenses: get().expenses
-                    .map(e => e.id === tempId ? newExpense : e)
-                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                expenses: sortExpensesByDateDesc(
+                    get().expenses.map(e => e.id === tempId ? newExpense : e)
+                )
             });
         } catch (error) {
             // Rollback on failure
@@ -100,20 +106,48 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
         }
     },
 
+    addExpensesBulk: async (items) => {
+        const timestamp = Date.now();
+        const tempIds = items.map((_, index) => `temp-${timestamp}-${index}`);
+        const optimisticExpenses: Expense[] = items.map((item, index) => ({
+            id: tempIds[index],
+            ...item,
+            accountName: item.account ? get().accounts.find((account) => account.id === item.account)?.name : undefined,
+        }));
+
+        set({
+            expenses: sortExpensesByDateDesc([...optimisticExpenses, ...get().expenses]),
+        });
+
+        try {
+            const createdExpenses = await addExpensesBulkToDB(items);
+            const createdByTempId = new Map(tempIds.map((tempId, index) => [tempId, createdExpenses[index]]));
+            set({
+                expenses: sortExpensesByDateDesc(
+                    get().expenses.map((expense) => createdByTempId.get(expense.id) ?? expense)
+                ),
+            });
+        } catch (error) {
+            const tempIdSet = new Set(tempIds);
+            set({ expenses: get().expenses.filter((expense) => !tempIdSet.has(expense.id)) });
+            throw error;
+        }
+    },
+
     updateExpense: async (id, data) => {
         // Snapshot for rollback
         const prev = get().expenses;
         set({
-            expenses: prev
-                .map(e => e.id === id ? { ...e, ...data } : e)
-                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            expenses: sortExpensesByDateDesc(
+                prev.map(e => e.id === id ? { ...e, ...data } : e)
+            )
         });
         try {
             const updated = await updateExpenseInDB(id, data);
             set({
-                expenses: get().expenses
-                    .map(e => e.id === id ? updated : e)
-                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                expenses: sortExpensesByDateDesc(
+                    get().expenses.map(e => e.id === id ? updated : e)
+                )
             });
         } catch (error) {
             set({ expenses: prev });

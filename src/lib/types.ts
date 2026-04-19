@@ -1,14 +1,3 @@
-export interface Expense {
-  id: string;
-  amount: number;
-  category: string;
-  paymentMethod: string;
-  account?: string; // This holds the account id (UUID)
-  accountName?: string; // This holds the human-readable account name
-  date: string; // ISO string
-  note?: string;
-}
-
 export const CATEGORIES = [
   'Food',
   'Transport',
@@ -30,6 +19,23 @@ export const PAYMENT_METHODS = [
   'Net Banking',
   'Wallet',
 ] as const;
+
+export type ExpenseCategory = typeof CATEGORIES[number];
+export type PaymentMethod = typeof PAYMENT_METHODS[number];
+
+export interface ExpenseInput {
+  amount: number;
+  category: ExpenseCategory;
+  paymentMethod: PaymentMethod;
+  account?: string; // This holds the account id (UUID)
+  date: string; // ISO string
+  note?: string;
+}
+
+export interface Expense extends ExpenseInput {
+  id: string;
+  accountName?: string; // This holds the human-readable account name
+}
 
 export const CATEGORY_COLORS: Record<string, string> = {
   Food: '#FF6B6B',
