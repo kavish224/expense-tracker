@@ -404,6 +404,23 @@ export default function AddExpenseModal() {
         });
     }, [submitting]);
 
+    const duplicateBulkRow = useCallback((rowId: string) => {
+        if (submitting) return;
+        setBulkRows((prev) => {
+            if (prev.length >= MAX_BULK_EXPENSES) return prev;
+            const idx = prev.findIndex((row) => row.id === rowId);
+            if (idx === -1) return prev;
+            const source = prev[idx];
+            const duplicate: BulkExpenseDraft = {
+                ...source,
+                id: createBulkDraft().id,
+            };
+            const next = [...prev];
+            next.splice(idx + 1, 0, duplicate);
+            return next;
+        });
+    }, [submitting]);
+
     const toggleBulkRowSelection = useCallback((rowId: string) => {
         if (submitting) return;
         setSelectedBulkRowIds((prev) => prev.includes(rowId) ? prev.filter((id) => id !== rowId) : [...prev, rowId]);
@@ -744,7 +761,7 @@ export default function AddExpenseModal() {
                                     </div>
                                 </div>
 
-                                <div className="rounded-[16px] border border-(--color-border2) bg-(--color-surface2) p-3 space-y-3">
+                                <div className="sticky top-0 z-10 rounded-[16px] border border-(--color-border2) bg-(--color-surface2)/95 backdrop-blur p-3 space-y-3">
                                     <div className="flex items-center justify-between gap-3">
                                         <p className="text-[13px] font-semibold text-(--color-text-primary)">
                                             Apply to Selected ({selectedBulkCount})
@@ -816,7 +833,141 @@ export default function AddExpenseModal() {
                                     </div>
                                 </div>
 
-                                <div className="mt-3 overflow-x-auto rounded-[16px] border border-(--color-border2) bg-(--color-surface2)">
+                                <div className="mt-3 space-y-2 md:hidden">
+                                    {bulkRows.map((row, index) => {
+                                        const rowAccountOptions = getAccountOptionsForPayment(row.paymentMethod);
+                                        const needsAccount = isAccountRequiredForPayment(row.paymentMethod);
+                                        const rowSelected = selectedBulkIds.includes(row.id);
+                                        const rowSelectedAccount = rowAccountOptions.length === 0
+                                            ? ''
+                                            : rowAccountOptions.some((item) => item.id === row.account)
+                                                ? row.account
+                                                : rowAccountOptions[0].id;
+
+                                        return (
+                                            <div key={row.id} className={`rounded-[14px] border p-3 space-y-2 ${rowSelected ? 'border-(--color-accent) bg-(--color-accent)/10' : 'border-(--color-border2) bg-(--color-surface2)'}`}>
+                                                <div className="flex items-center justify-between">
+                                                    <label className="inline-flex items-center gap-2">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={rowSelected}
+                                                            onChange={() => toggleBulkRowSelection(row.id)}
+                                                            disabled={submitting}
+                                                            className="h-5 w-5 accent-(--color-accent)"
+                                                        />
+                                                        <span className="text-[12px] font-semibold text-(--color-text-secondary) uppercase tracking-wide">Expense {index + 1}</span>
+                                                    </label>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => duplicateBulkRow(row.id)}
+                                                            disabled={submitting || bulkRows.length >= MAX_BULK_EXPENSES}
+                                                            className="h-8 px-2.5 rounded-lg bg-(--color-surface) border border-(--color-border2) text-[12px] text-(--color-text-secondary) disabled:opacity-50"
+                                                        >
+                                                            Duplicate
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeBulkRow(row.id)}
+                                                            disabled={submitting}
+                                                            className="h-8 px-2.5 rounded-lg bg-(--color-surface) border border-(--color-border2) text-[12px] text-(--color-red) disabled:opacity-50"
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <input
+                                                    ref={(el) => {
+                                                        bulkAmountRefs.current[row.id] = el;
+                                                    }}
+                                                    type="number"
+                                                    inputMode="decimal"
+                                                    placeholder="Amount"
+                                                    value={row.amount}
+                                                    onChange={(e) => updateBulkRow(row.id, { amount: e.target.value })}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key !== 'Enter' || submitting) return;
+                                                        e.preventDefault();
+                                                        const nextRow = bulkRows[index + 1];
+                                                        if (nextRow) {
+                                                            bulkAmountRefs.current[nextRow.id]?.focus();
+                                                            return;
+                                                        }
+                                                        addBulkRow();
+                                                    }}
+                                                    disabled={submitting}
+                                                    className="w-full h-11 bg-(--color-surface) border border-(--color-border2) rounded-xl px-3 text-[15px] text-(--color-text-primary) outline-none focus:border-(--color-accent)"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Description"
+                                                    value={row.note || ''}
+                                                    onChange={(e) => updateBulkRow(row.id, { note: e.target.value })}
+                                                    disabled={submitting}
+                                                    maxLength={200}
+                                                    className="w-full h-11 bg-(--color-surface) border border-(--color-border2) rounded-xl px-3 text-[14px] text-(--color-text-primary) outline-none focus:border-(--color-accent)"
+                                                />
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <select
+                                                        value={row.category}
+                                                        onChange={(e) => updateBulkRow(row.id, { category: e.target.value as ExpenseCategory })}
+                                                        disabled={submitting}
+                                                        className="w-full h-11 bg-(--color-surface) border border-(--color-border2) rounded-xl px-3 text-[13px] text-(--color-text-primary) outline-none focus:border-(--color-accent)"
+                                                    >
+                                                        {CATEGORIES.map((categoryOption) => (
+                                                            <option key={categoryOption} value={categoryOption}>
+                                                                {categoryOption}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    <select
+                                                        value={row.paymentMethod}
+                                                        onChange={(e) => {
+                                                            const nextPaymentMethod = e.target.value as PaymentMethod;
+                                                            const nextRowAccounts = getAccountOptionsForPayment(nextPaymentMethod);
+                                                            const nextAccount = nextRowAccounts.length === 0
+                                                                ? ''
+                                                                : nextRowAccounts.some((item) => item.id === row.account)
+                                                                    ? row.account
+                                                                    : nextRowAccounts[0].id;
+                                                            updateBulkRow(row.id, {
+                                                                paymentMethod: nextPaymentMethod,
+                                                                account: nextAccount,
+                                                            });
+                                                        }}
+                                                        disabled={submitting}
+                                                        className="w-full h-11 bg-(--color-surface) border border-(--color-border2) rounded-xl px-3 text-[13px] text-(--color-text-primary) outline-none focus:border-(--color-accent)"
+                                                    >
+                                                        {PAYMENT_METHODS.map((paymentOption) => (
+                                                            <option key={paymentOption} value={paymentOption}>
+                                                                {paymentOption}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <select
+                                                    value={rowSelectedAccount}
+                                                    onChange={(e) => updateBulkRow(row.id, { account: e.target.value })}
+                                                    disabled={submitting || !needsAccount || rowAccountOptions.length === 0}
+                                                    className="w-full h-11 bg-(--color-surface) border border-(--color-border2) rounded-xl px-3 text-[13px] text-(--color-text-primary) outline-none focus:border-(--color-accent) disabled:opacity-50"
+                                                >
+                                                    {!needsAccount && <option value="">Account not required</option>}
+                                                    {needsAccount && rowAccountOptions.length > 0 && rowAccountOptions.map((accountOption) => (
+                                                        <option key={accountOption.id} value={accountOption.id}>
+                                                            {accountOption.name}
+                                                        </option>
+                                                    ))}
+                                                    {needsAccount && rowAccountOptions.length === 0 && (
+                                                        <option value="">No compatible account</option>
+                                                    )}
+                                                </select>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="mt-3 hidden md:block overflow-x-auto rounded-[16px] border border-(--color-border2) bg-(--color-surface2)">
                                     <table className="min-w-[860px] w-full text-left">
                                         <thead className="bg-(--color-surface)">
                                             <tr className="text-[11px] uppercase tracking-wide text-(--color-text-secondary)">
@@ -826,6 +977,7 @@ export default function AddExpenseModal() {
                                                 <th className="px-3 py-2 w-36">Category</th>
                                                 <th className="px-3 py-2 w-36">Payment</th>
                                                 <th className="px-3 py-2 w-40">Account</th>
+                                                <th className="px-3 py-2 w-24">Duplicate</th>
                                                 <th className="px-3 py-2 w-16">Del</th>
                                             </tr>
                                         </thead>
@@ -948,6 +1100,16 @@ export default function AddExpenseModal() {
                                                                     </option>
                                                                 )}
                                                             </select>
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => duplicateBulkRow(row.id)}
+                                                                disabled={submitting || bulkRows.length >= MAX_BULK_EXPENSES}
+                                                                className="h-9 px-2.5 rounded-lg bg-(--color-surface) border border-(--color-border2) text-(--color-text-secondary) disabled:opacity-50 text-[12px]"
+                                                            >
+                                                                Copy
+                                                            </button>
                                                         </td>
                                                         <td className="px-3 py-2">
                                                             <button
