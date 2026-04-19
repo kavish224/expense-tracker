@@ -18,11 +18,6 @@ const CATEGORY_EMOJI: Record<string, string> = {
 
 export default function Analytics() {
     const { expenses, accounts, openEditModal, loading } = useExpenseStore();
-
-    if (loading.initial) {
-        return <div className="flex items-center justify-center h-full"><LoadingSpinner size="lg" /></div>;
-    }
-
     const [searchTerm, setSearchTerm] = useState('');
     const [filterCategory, setFilterCategory] = useState<string>('All');
     const [filterAccount, setFilterAccount] = useState<string>('All');
@@ -71,7 +66,9 @@ export default function Analytics() {
     }, [filteredExpenses, sortBy]);
 
     const categories = useMemo(() => Array.from(new Set(expenses.map(e => e.category))), [expenses]);
-
+    if (loading.initial) {
+        return <div className="flex items-center justify-center h-full"><LoadingSpinner size="lg" /></div>;
+    }
     return (
         <main className="mx-auto max-w-lg px-4 pt-5 pb-8 space-y-6">
 

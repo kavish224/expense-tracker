@@ -13,9 +13,6 @@ import { Account } from '@/lib/types';
 export default function Accounts() {
     const { expenses, accounts, addAccount, deleteAccount, loading } = useExpenseStore();
 
-    if (loading.initial) {
-        return <div className="flex items-center justify-center h-full"><LoadingSpinner size="lg" /></div>;
-    }
     const { showToast } = useToast();
 
     const [newName, setNewName] = useState('');
@@ -28,6 +25,9 @@ export default function Accounts() {
 
     const totalSpend = useMemo(() => expenses.reduce((sum, e) => sum + e.amount, 0), [expenses]);
     const accountBreakdown = useMemo(() => getAccountTotals(expenses), [expenses]);
+    if (loading.initial) {
+        return <div className="flex items-center justify-center h-full"><LoadingSpinner size="lg" /></div>;
+    }
 
     const handleAddAccount = async (e: React.FormEvent) => {
         e.preventDefault();

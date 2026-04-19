@@ -1,8 +1,9 @@
 // To run this script, execute:
 // node scripts/init-db.js
 
-const { neon } = require('@neondatabase/serverless');
-require('dotenv').config({ path: '.env.local' });
+import { neon } from '@neondatabase/serverless';
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
 const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
 if (!databaseUrl) throw new Error('DATABASE_URL is not set');
 const sql = neon(databaseUrl);

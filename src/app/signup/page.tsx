@@ -39,7 +39,7 @@ export default function SignupPage() {
                 setUser(data.user);
                 router.replace('/');
             }
-        } catch (err) {
+        } catch {
             setError('An unexpected error occurred');
         } finally {
             setLoading(false);

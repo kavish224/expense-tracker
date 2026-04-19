@@ -130,7 +130,7 @@ export default function ExportCSVButton() {
             document.body.removeChild(link);
 
             showToast(`Successfully exported ${filtered.length} transactions`, 'success');
-        } catch (error) {
+        } catch {
             showToast('Failed to export CSV', 'error');
         }
     };
