@@ -54,6 +54,10 @@ export default function AddExpenseModal() {
     const [account, setAccount] = useState('');
     const [note, setNote] = useState('');
     const [bulkRows, setBulkRows] = useState<BulkExpenseDraft[]>([createBulkDraft()]);
+    const [selectedBulkRowIds, setSelectedBulkRowIds] = useState<string[]>([]);
+    const [bulkApplyCategory, setBulkApplyCategory] = useState<ExpenseCategory>(CATEGORIES[0]);
+    const [bulkApplyPayment, setBulkApplyPayment] = useState<PaymentMethod>(PAYMENT_METHODS[0]);
+    const [bulkApplyAccount, setBulkApplyAccount] = useState('');
     const [date, setDate] = useState(new Date().toISOString());
     const [showCalendar, setShowCalendar] = useState(false);
     const [showTimePicker, setShowTimePicker] = useState(false);
@@ -61,6 +65,7 @@ export default function AddExpenseModal() {
     const [confirmDelete, setConfirmDelete] = useState(false);
 
     const singleNoteRef = useRef<HTMLInputElement>(null);
+    const bulkAmountRefs = useRef<Record<string, HTMLInputElement | null>>({});
     const backdropRef = useRef<HTMLDivElement>(null);
 
     const [dragStartY, setDragStartY] = useState<number | null>(null);
@@ -96,6 +101,8 @@ export default function AddExpenseModal() {
         if (paymentMethod === 'Credit Card') return accounts.filter((item) => item.type === 'CreditCard');
         return [];
     }, [accounts, paymentMethod]);
+
+    const bulkApplyAccountOptions = useMemo(() => getAccountOptionsForPayment(bulkApplyPayment), [bulkApplyPayment, getAccountOptionsForPayment]);
 
     const selectedAccount = useMemo(() => {
         if (editingExpense && isModalOpen) return account;
@@ -191,6 +198,10 @@ export default function AddExpenseModal() {
                 setAccount(editingExpense.account || '');
                 setNote(editingExpense.note || '');
                 setBulkRows([createBulkDraft()]);
+                setSelectedBulkRowIds([]);
+                setBulkApplyCategory(CATEGORIES[0]);
+                setBulkApplyPayment(PAYMENT_METHODS[0]);
+                setBulkApplyAccount('');
                 setDate(editingExpense.date);
             } else {
                 setEntryMode('single');
@@ -200,6 +211,10 @@ export default function AddExpenseModal() {
                 setAccount('');
                 setNote('');
                 setBulkRows([createBulkDraft()]);
+                setSelectedBulkRowIds([]);
+                setBulkApplyCategory(CATEGORIES[0]);
+                setBulkApplyPayment(PAYMENT_METHODS[0]);
+                setBulkApplyAccount('');
                 setDate(new Date().toISOString());
             }
 
@@ -370,11 +385,16 @@ export default function AddExpenseModal() {
 
     const addBulkRow = useCallback(() => {
         if (submitting) return;
-        setBulkRows((prev) => prev.length >= MAX_BULK_EXPENSES ? prev : [...prev, createBulkDraft()]);
+        const newRow = createBulkDraft();
+        setBulkRows((prev) => prev.length >= MAX_BULK_EXPENSES ? prev : [...prev, newRow]);
+        window.requestAnimationFrame(() => {
+            bulkAmountRefs.current[newRow.id]?.focus();
+        });
     }, [submitting]);
 
     const removeBulkRow = useCallback((rowId: string) => {
         if (submitting) return;
+        setSelectedBulkRowIds((prev) => prev.filter((id) => id !== rowId));
         setBulkRows((prev) => {
             if (prev.length <= 1) {
                 const first = prev[0] ?? createBulkDraft();
@@ -383,6 +403,58 @@ export default function AddExpenseModal() {
             return prev.filter((row) => row.id !== rowId);
         });
     }, [submitting]);
+
+    const toggleBulkRowSelection = useCallback((rowId: string) => {
+        if (submitting) return;
+        setSelectedBulkRowIds((prev) => prev.includes(rowId) ? prev.filter((id) => id !== rowId) : [...prev, rowId]);
+    }, [submitting]);
+
+    const toggleSelectAllBulkRows = useCallback(() => {
+        if (submitting) return;
+        setSelectedBulkRowIds((prev) => {
+            const validRowIds = bulkRows.map((row) => row.id);
+            const currentlySelected = prev.filter((id) => validRowIds.includes(id));
+            if (currentlySelected.length === validRowIds.length) return [];
+            return validRowIds;
+        });
+    }, [submitting, bulkRows]);
+
+    const applyCategoryToSelectedRows = useCallback(() => {
+        if (submitting || selectedBulkRowIds.length === 0) return;
+        setBulkRows((prev) => prev.map((row) => selectedBulkRowIds.includes(row.id)
+            ? { ...row, category: bulkApplyCategory }
+            : row));
+    }, [submitting, selectedBulkRowIds, bulkApplyCategory]);
+
+    const applyPaymentToSelectedRows = useCallback(() => {
+        if (submitting || selectedBulkRowIds.length === 0) return;
+        const resolvedApplyAccount = bulkApplyAccountOptions.some((item) => item.id === bulkApplyAccount)
+            ? bulkApplyAccount
+            : (bulkApplyAccountOptions[0]?.id ?? '');
+        setBulkRows((prev) => prev.map((row) => {
+            if (!selectedBulkRowIds.includes(row.id)) return row;
+            const nextOptions = getAccountOptionsForPayment(bulkApplyPayment);
+            const nextAccount = nextOptions.length === 0
+                ? ''
+                : nextOptions.some((item) => item.id === resolvedApplyAccount)
+                    ? resolvedApplyAccount
+                    : nextOptions[0].id;
+            return {
+                ...row,
+                paymentMethod: bulkApplyPayment,
+                account: nextAccount,
+            };
+        }));
+    }, [submitting, selectedBulkRowIds, bulkApplyPayment, bulkApplyAccount, bulkApplyAccountOptions, getAccountOptionsForPayment]);
+
+    const removeSelectedBulkRows = useCallback(() => {
+        if (submitting || selectedBulkRowIds.length === 0) return;
+        setBulkRows((prev) => {
+            const filtered = prev.filter((row) => !selectedBulkRowIds.includes(row.id));
+            return filtered.length > 0 ? filtered : [createBulkDraft()];
+        });
+        setSelectedBulkRowIds([]);
+    }, [submitting, selectedBulkRowIds]);
 
     const handlePointerDown = (e: React.PointerEvent) => {
         setDragStartY(e.clientY);
@@ -430,6 +502,14 @@ export default function AddExpenseModal() {
             : entryMode === 'bulk'
                 ? bulkExpenses.length > 0 ? `Add ${bulkExpenses.length} Expenses` : 'Add Expenses'
                 : 'Add Expense';
+
+    const validBulkRowIds = bulkRows.map((row) => row.id);
+    const selectedBulkIds = selectedBulkRowIds.filter((id) => validBulkRowIds.includes(id));
+    const selectedBulkCount = selectedBulkIds.length;
+    const allBulkRowsSelected = bulkRows.length > 0 && selectedBulkCount === bulkRows.length;
+    const resolvedBulkApplyAccount = bulkApplyAccountOptions.some((item) => item.id === bulkApplyAccount)
+        ? bulkApplyAccount
+        : (bulkApplyAccountOptions[0]?.id ?? '');
 
     const sharedFields = (
         <>
@@ -643,124 +723,247 @@ export default function AddExpenseModal() {
                         <>
                             <div>
                                 <div className="flex items-center justify-between gap-3 mb-2">
-                                    <p className="text-[12px] font-semibold text-(--color-text-secondary) uppercase tracking-wide">Expenses</p>
-                                    <button
-                                        type="button"
-                                        onClick={addBulkRow}
-                                        disabled={submitting || bulkRows.length >= MAX_BULK_EXPENSES}
-                                        className="text-[13px] font-medium text-(--color-accent) disabled:opacity-50"
-                                    >
-                                        + Add Row
-                                    </button>
+                                    <p className="text-[12px] font-semibold text-(--color-text-secondary) uppercase tracking-wide">Grid Editor</p>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={toggleSelectAllBulkRows}
+                                            disabled={submitting || bulkRows.length === 0}
+                                            className="h-8 px-3 rounded-lg text-[12px] font-medium bg-(--color-surface2) text-(--color-text-secondary) disabled:opacity-50"
+                                        >
+                                            {allBulkRowsSelected ? 'Unselect All' : 'Select All'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={addBulkRow}
+                                            disabled={submitting || bulkRows.length >= MAX_BULK_EXPENSES}
+                                            className="h-8 px-3 rounded-lg text-[12px] font-semibold bg-(--color-accent) text-white disabled:opacity-50"
+                                        >
+                                            + Add Row
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="space-y-3">
-                                    {bulkRows.map((row, index) => {
-                                        const rowAccountOptions = getAccountOptionsForPayment(row.paymentMethod);
-                                        const needsAccount = isAccountRequiredForPayment(row.paymentMethod);
-                                        const rowSelectedAccount = rowAccountOptions.length === 0
-                                            ? ''
-                                            : rowAccountOptions.some((item) => item.id === row.account)
-                                                ? row.account
-                                                : rowAccountOptions[0].id;
 
-                                        return (
-                                            <div key={row.id} className="rounded-[16px] border border-(--color-border2) bg-(--color-surface2) p-3 space-y-2">
-                                                <div className="flex items-center justify-between">
-                                                    <p className="text-[12px] font-semibold text-(--color-text-secondary) uppercase tracking-wide">Expense {index + 1}</p>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeBulkRow(row.id)}
-                                                        disabled={submitting}
-                                                        className="text-[12px] font-medium text-(--color-red) disabled:opacity-50"
-                                                    >
-                                                        Remove
-                                                    </button>
-                                                </div>
+                                <div className="rounded-[16px] border border-(--color-border2) bg-(--color-surface2) p-3 space-y-3">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <p className="text-[13px] font-semibold text-(--color-text-primary)">
+                                            Apply to Selected ({selectedBulkCount})
+                                        </p>
+                                        {selectedBulkCount > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={removeSelectedBulkRows}
+                                                disabled={submitting}
+                                                className="text-[12px] font-medium text-(--color-red) disabled:opacity-50"
+                                            >
+                                                Delete Selected
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+                                        <select
+                                            value={bulkApplyCategory}
+                                            onChange={(e) => setBulkApplyCategory(e.target.value as ExpenseCategory)}
+                                            disabled={submitting}
+                                            className="h-10 bg-(--color-surface) border border-(--color-border2) rounded-xl px-3 text-[13px] text-(--color-text-primary) outline-none focus:border-(--color-accent)"
+                                        >
+                                            {CATEGORIES.map((item) => (
+                                                <option key={item} value={item}>{item}</option>
+                                            ))}
+                                        </select>
+                                        <button
+                                            type="button"
+                                            onClick={applyCategoryToSelectedRows}
+                                            disabled={submitting || selectedBulkCount === 0}
+                                            className="h-10 px-4 rounded-xl text-[13px] font-semibold bg-(--color-surface) border border-(--color-border2) text-(--color-text-primary) disabled:opacity-50"
+                                        >
+                                            Apply Category
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                                        <select
+                                            value={bulkApplyPayment}
+                                            onChange={(e) => setBulkApplyPayment(e.target.value as PaymentMethod)}
+                                            disabled={submitting}
+                                            className="h-10 bg-(--color-surface) border border-(--color-border2) rounded-xl px-3 text-[13px] text-(--color-text-primary) outline-none focus:border-(--color-accent)"
+                                        >
+                                            {PAYMENT_METHODS.map((item) => (
+                                                <option key={item} value={item}>{item}</option>
+                                            ))}
+                                        </select>
+                                        <select
+                                            value={resolvedBulkApplyAccount}
+                                            onChange={(e) => setBulkApplyAccount(e.target.value)}
+                                            disabled={submitting || bulkApplyAccountOptions.length === 0}
+                                            className="h-10 bg-(--color-surface) border border-(--color-border2) rounded-xl px-3 text-[13px] text-(--color-text-primary) outline-none focus:border-(--color-accent) disabled:opacity-50"
+                                        >
+                                            {bulkApplyAccountOptions.length > 0 ? (
+                                                bulkApplyAccountOptions.map((item) => (
+                                                    <option key={item.id} value={item.id}>{item.name}</option>
+                                                ))
+                                            ) : (
+                                                <option value="">Auto account</option>
+                                            )}
+                                        </select>
+                                        <button
+                                            type="button"
+                                            onClick={applyPaymentToSelectedRows}
+                                            disabled={submitting || selectedBulkCount === 0}
+                                            className="h-10 px-4 rounded-xl text-[13px] font-semibold bg-(--color-surface) border border-(--color-border2) text-(--color-text-primary) disabled:opacity-50"
+                                        >
+                                            Apply Payment
+                                        </button>
+                                    </div>
+                                </div>
 
-                                                <div className="grid grid-cols-1 gap-2">
-                                                    <input
-                                                        type="number"
-                                                        inputMode="decimal"
-                                                        placeholder="Amount"
-                                                        value={row.amount}
-                                                        onChange={(e) => updateBulkRow(row.id, { amount: e.target.value })}
-                                                        disabled={submitting}
-                                                        className="w-full h-11 bg-(--color-surface) border border-(--color-border2) rounded-xl px-3 text-[15px] text-(--color-text-primary) placeholder:text-(--color-text-muted) outline-none focus:border-(--color-accent) transition-colors disabled:opacity-50"
-                                                    />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Description"
-                                                        value={row.note || ''}
-                                                        onChange={(e) => updateBulkRow(row.id, { note: e.target.value })}
-                                                        disabled={submitting}
-                                                        maxLength={200}
-                                                        className="w-full h-11 bg-(--color-surface) border border-(--color-border2) rounded-xl px-3 text-[15px] text-(--color-text-primary) placeholder:text-(--color-text-muted) outline-none focus:border-(--color-accent) transition-colors disabled:opacity-50"
-                                                    />
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        <select
-                                                            value={row.category}
-                                                            onChange={(e) => updateBulkRow(row.id, { category: e.target.value as ExpenseCategory })}
-                                                            disabled={submitting}
-                                                            className="w-full h-11 bg-(--color-surface) border border-(--color-border2) rounded-xl px-3 text-[14px] text-(--color-text-primary) outline-none focus:border-(--color-accent) transition-colors disabled:opacity-50"
-                                                        >
-                                                            {CATEGORIES.map((categoryOption) => (
-                                                                <option key={categoryOption} value={categoryOption}>
-                                                                    {categoryOption}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                        <select
-                                                            value={row.paymentMethod}
-                                                            onChange={(e) => {
-                                                                const nextPaymentMethod = e.target.value as PaymentMethod;
-                                                                const nextRowAccounts = getAccountOptionsForPayment(nextPaymentMethod);
-                                                                const nextAccount = nextRowAccounts.length === 0
-                                                                    ? ''
-                                                                    : nextRowAccounts.some((item) => item.id === row.account)
-                                                                        ? row.account
-                                                                        : nextRowAccounts[0].id;
-                                                                updateBulkRow(row.id, {
-                                                                    paymentMethod: nextPaymentMethod,
-                                                                    account: nextAccount,
-                                                                });
-                                                            }}
-                                                            disabled={submitting}
-                                                            className="w-full h-11 bg-(--color-surface) border border-(--color-border2) rounded-xl px-3 text-[14px] text-(--color-text-primary) outline-none focus:border-(--color-accent) transition-colors disabled:opacity-50"
-                                                        >
-                                                            {PAYMENT_METHODS.map((paymentOption) => (
-                                                                <option key={paymentOption} value={paymentOption}>
-                                                                    {paymentOption}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-                                                    {needsAccount && (
-                                                        <select
-                                                            value={rowSelectedAccount}
-                                                            onChange={(e) => updateBulkRow(row.id, { account: e.target.value })}
-                                                            disabled={submitting || rowAccountOptions.length === 0}
-                                                            className="w-full h-11 bg-(--color-surface) border border-(--color-border2) rounded-xl px-3 text-[14px] text-(--color-text-primary) outline-none focus:border-(--color-accent) transition-colors disabled:opacity-50"
-                                                        >
-                                                            {rowAccountOptions.length > 0 ? (
-                                                                rowAccountOptions.map((accountOption) => (
+                                <div className="mt-3 overflow-x-auto rounded-[16px] border border-(--color-border2) bg-(--color-surface2)">
+                                    <table className="min-w-[860px] w-full text-left">
+                                        <thead className="bg-(--color-surface)">
+                                            <tr className="text-[11px] uppercase tracking-wide text-(--color-text-secondary)">
+                                                <th className="px-3 py-2 w-10">#</th>
+                                                <th className="px-3 py-2 w-36">Amount</th>
+                                                <th className="px-3 py-2 min-w-[180px]">Description</th>
+                                                <th className="px-3 py-2 w-36">Category</th>
+                                                <th className="px-3 py-2 w-36">Payment</th>
+                                                <th className="px-3 py-2 w-40">Account</th>
+                                                <th className="px-3 py-2 w-16">Del</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {bulkRows.map((row, index) => {
+                                                const rowAccountOptions = getAccountOptionsForPayment(row.paymentMethod);
+                                                const needsAccount = isAccountRequiredForPayment(row.paymentMethod);
+                                                const rowSelected = selectedBulkIds.includes(row.id);
+                                                const rowSelectedAccount = rowAccountOptions.length === 0
+                                                    ? ''
+                                                    : rowAccountOptions.some((item) => item.id === row.account)
+                                                        ? row.account
+                                                        : rowAccountOptions[0].id;
+
+                                                return (
+                                                    <tr key={row.id} className={`border-t border-(--color-border2) ${rowSelected ? 'bg-(--color-accent)/10' : ''}`}>
+                                                        <td className="px-3 py-2 align-top">
+                                                            <label className="inline-flex items-center gap-1">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={rowSelected}
+                                                                    onChange={() => toggleBulkRowSelection(row.id)}
+                                                                    disabled={submitting}
+                                                                    className="h-4 w-4 accent-(--color-accent)"
+                                                                />
+                                                                <span className="text-[11px] text-(--color-text-secondary)">{index + 1}</span>
+                                                            </label>
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <input
+                                                                ref={(el) => {
+                                                                    bulkAmountRefs.current[row.id] = el;
+                                                                }}
+                                                                type="number"
+                                                                inputMode="decimal"
+                                                                placeholder="0"
+                                                                value={row.amount}
+                                                                onChange={(e) => updateBulkRow(row.id, { amount: e.target.value })}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key !== 'Enter' || submitting) return;
+                                                                    e.preventDefault();
+                                                                    const nextRow = bulkRows[index + 1];
+                                                                    if (nextRow) {
+                                                                        bulkAmountRefs.current[nextRow.id]?.focus();
+                                                                        return;
+                                                                    }
+                                                                    addBulkRow();
+                                                                }}
+                                                                disabled={submitting}
+                                                                className="w-full h-10 bg-(--color-surface) border border-(--color-border2) rounded-lg px-2.5 text-[14px] text-(--color-text-primary) outline-none focus:border-(--color-accent)"
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Description"
+                                                                value={row.note || ''}
+                                                                onChange={(e) => updateBulkRow(row.id, { note: e.target.value })}
+                                                                disabled={submitting}
+                                                                maxLength={200}
+                                                                className="w-full h-10 bg-(--color-surface) border border-(--color-border2) rounded-lg px-2.5 text-[14px] text-(--color-text-primary) outline-none focus:border-(--color-accent)"
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <select
+                                                                value={row.category}
+                                                                onChange={(e) => updateBulkRow(row.id, { category: e.target.value as ExpenseCategory })}
+                                                                disabled={submitting}
+                                                                className="w-full h-10 bg-(--color-surface) border border-(--color-border2) rounded-lg px-2.5 text-[13px] text-(--color-text-primary) outline-none focus:border-(--color-accent)"
+                                                            >
+                                                                {CATEGORIES.map((categoryOption) => (
+                                                                    <option key={categoryOption} value={categoryOption}>
+                                                                        {categoryOption}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <select
+                                                                value={row.paymentMethod}
+                                                                onChange={(e) => {
+                                                                    const nextPaymentMethod = e.target.value as PaymentMethod;
+                                                                    const nextRowAccounts = getAccountOptionsForPayment(nextPaymentMethod);
+                                                                    const nextAccount = nextRowAccounts.length === 0
+                                                                        ? ''
+                                                                        : nextRowAccounts.some((item) => item.id === row.account)
+                                                                            ? row.account
+                                                                            : nextRowAccounts[0].id;
+                                                                    updateBulkRow(row.id, {
+                                                                        paymentMethod: nextPaymentMethod,
+                                                                        account: nextAccount,
+                                                                    });
+                                                                }}
+                                                                disabled={submitting}
+                                                                className="w-full h-10 bg-(--color-surface) border border-(--color-border2) rounded-lg px-2.5 text-[13px] text-(--color-text-primary) outline-none focus:border-(--color-accent)"
+                                                            >
+                                                                {PAYMENT_METHODS.map((paymentOption) => (
+                                                                    <option key={paymentOption} value={paymentOption}>
+                                                                        {paymentOption}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <select
+                                                                value={rowSelectedAccount}
+                                                                onChange={(e) => updateBulkRow(row.id, { account: e.target.value })}
+                                                                disabled={submitting || !needsAccount || rowAccountOptions.length === 0}
+                                                                className="w-full h-10 bg-(--color-surface) border border-(--color-border2) rounded-lg px-2.5 text-[13px] text-(--color-text-primary) outline-none focus:border-(--color-accent) disabled:opacity-50"
+                                                            >
+                                                                {!needsAccount && <option value="">Not required</option>}
+                                                                {needsAccount && rowAccountOptions.length > 0 && rowAccountOptions.map((accountOption) => (
                                                                     <option key={accountOption.id} value={accountOption.id}>
                                                                         {accountOption.name}
                                                                     </option>
-                                                                ))
-                                                            ) : (
-                                                                <option value="">
-                                                                    {row.paymentMethod === 'Credit Card' ? 'No Credit Card account available' : 'No Bank account available'}
-                                                                </option>
-                                                            )}
-                                                        </select>
-                                                    )}
-                                                    {needsAccount && rowAccountOptions.length === 0 && (
-                                                        <p className="text-[12px] text-(--color-red)">Create a matching account in Accounts to use {row.paymentMethod}.</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                                                                ))}
+                                                                {needsAccount && rowAccountOptions.length === 0 && (
+                                                                    <option value="">
+                                                                        {row.paymentMethod === 'Credit Card' ? 'No Credit Card account' : 'No Bank account'}
+                                                                    </option>
+                                                                )}
+                                                            </select>
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removeBulkRow(row.id)}
+                                                                disabled={submitting}
+                                                                className="h-9 w-9 rounded-lg bg-(--color-surface) border border-(--color-border2) text-(--color-red) disabled:opacity-50"
+                                                            >
+                                                                ×
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
 
