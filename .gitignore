@@ -1,0 +1,17 @@
+node_modules
+.next
+out
+.env
+.env*.local
+*.log
+.DS_Store
+.pgdata
+coverage
+next-env.d.ts
+.npmcache*
+._DELETE_*
+/generated
+prisma/generated
+vitest.config.ts.timestamp-*
+.vercel
+.env*

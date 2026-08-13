@@ -1,0 +1,184 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Design tokens v2 — dark-default, premium fintech aesthetic.
+   Zinc-cool near-black surfaces with a lightness-based elevation ladder
+   (base → card → raised → overlay), text at 98/64/45% not pure white,
+   a single refined iris accent (lighter + cleaner in dark), emerald for
+   positive, and a harmonised 8-hue categorical palette tuned for dark.
+   Grounded in 2026 dark-mode + fintech UI research.
+   ============================================================ */
+:root,
+[data-theme="dark"] {
+  --bg-canvas: #0A0A0C;
+  --surface-1: #141418;
+  --surface-2: #1C1C22;
+  --surface-3: #24242B;
+  --hairline: #26262E;
+  --hairline-strong: #33333D;
+  --ink: #FAFAFA;
+  --ink-muted: #A1A1AA;
+  --ink-subtle: #71717A;
+  --accent: #8B7CFF;
+  --accent-hover: #A093FF;
+  --accent-tint: #1B1930;
+  --accent-glow: rgba(139, 124, 255, 0.35);
+  --accent-grad: linear-gradient(135deg, #8B7CFF 0%, #6D5EF0 100%);
+  --pos: #34D399;
+  --pos-tint: #10231C;
+  --neg: #F87171;
+  --neg-tint: #2A1618;
+  --warn: #FBBF24;
+  --warn-tint: #271E10;
+  --card-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-e1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-e2: 0 8px 28px rgba(0, 0, 0, 0.5);
+  --shadow-e3: 0 20px 56px rgba(0, 0, 0, 0.66);
+  /* categorical 8-hue (dark-tuned, harmonised ~70% L jewel tones) */
+  --c-food: #F2955C;      /* warm orange */
+  --c-grocery: #5FD08A;   /* green */
+  --c-transport: #5AA9F0; /* blue */
+  --c-shop: #A78BFA;      /* violet */
+  --c-bills: #E7B24C;     /* gold */
+  --c-health: #F07AA8;    /* rose */
+  --c-ent: #4FD1C5;       /* teal */
+  --c-misc: #94A3B8;      /* slate */
+  --c-income: #34D399;    /* emerald */
+  /* iOS "Liquid Glass" chrome: translucent surface + backdrop blur so the tab
+     bar/rail read as floating frosted panels over content, like native
+     UITabBar/UISplitView chrome, instead of flat opaque bars. */
+  --glass-bg: rgba(20, 20, 24, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+[data-theme="light"] {
+  --bg-canvas: #FBFBFA;
+  --surface-1: #FFFFFF;
+  --surface-2: #F4F4F5;
+  --surface-3: #EFEFF1;
+  --hairline: #E9E9EC;
+  --hairline-strong: #D8D8DD;
+  --ink: #18181B;
+  --ink-muted: #52525B;
+  --ink-subtle: #A1A1AA;
+  --accent: #6D5EF0;
+  --accent-hover: #5B4CE0;
+  --accent-tint: #EEEBFE;
+  --accent-glow: rgba(109, 94, 240, 0.28);
+  --accent-grad: linear-gradient(135deg, #7A6BF5 0%, #6D5EF0 100%);
+  --pos: #059669;
+  --pos-tint: #E7F6EF;
+  --neg: #DC2626;
+  --neg-tint: #FBECEC;
+  --warn: #B45309;
+  --warn-tint: #FBF1E0;
+  --card-highlight: inset 0 0 0 transparent;
+  --shadow-e1: 0 1px 2px rgba(24, 24, 27, 0.05);
+  --shadow-e2: 0 8px 28px rgba(24, 24, 27, 0.1);
+  --shadow-e3: 0 20px 56px rgba(24, 24, 27, 0.16);
+  --c-food: #E0713C;
+  --c-grocery: #2FA36A;
+  --c-transport: #2E86D6;
+  --c-shop: #7C5CE0;
+  --c-bills: #C9962E;
+  --c-health: #D6568F;
+  --c-ent: #0E9A8C;
+  --c-misc: #64748B;
+  --c-income: #059669;
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(24, 24, 27, 0.06);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+* { box-sizing: border-box; }
+html, body { padding: 0; margin: 0; }
+html {
+  background: var(--bg-canvas);
+  /* Stops the white/canvas-mismatch flash iOS shows past the rubber-band
+     scroll edge in standalone PWA mode (there's no browser chrome to hide it). */
+  overscroll-behavior: none;
+  /* viewport-fit=cover (in layout.tsx) draws the app edge-to-edge under the
+     notch/Dynamic Island and home indicator — without this, normal-flow
+     content collides with the iOS status bar. Fixed-position elements (tab
+     bar, toasts) reserve their own safe-area padding separately below;
+     resolving env() at zero on non-notch devices/desktop makes this a no-op there. */
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+body {
+  background: var(--bg-canvas);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-size: 15px;
+  line-height: 1.5;
+  letter-spacing: -0.006em;
+  overscroll-behavior-y: none;
+  min-height: 100dvh;
+}
+.num, .tabular { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--hairline-strong); border-radius: 999px; border: 3px solid var(--bg-canvas); }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-subtle); }
+
+/* skeleton shimmer */
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--hairline) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.3s ease-in-out infinite;
+  border-radius: 7px;
+}
+
+/* motion */
+@keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes popIn { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
+.anim-sheet { animation: sheetUp .3s cubic-bezier(.16,1,.3,1); }
+.anim-fade { animation: fadeIn .2s ease; }
+.anim-pop { animation: popIn .22s cubic-bezier(.16,1,.3,1); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+/* utilities */
+.overline { font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-subtle); }
+.kbd {
+  font-family: ui-monospace, "SF Mono", monospace; font-size: 11px;
+  background: var(--surface-2); border: 1px solid var(--hairline); border-bottom-width: 2px;
+  border-radius: 5px; padding: 1px 6px; color: var(--ink-muted);
+}
+.card-hl { box-shadow: var(--card-highlight); }
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: var(--glass-highlight);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  /* Older/unsupported browsers get a solid fallback rather than a see-through bar. */
+  .glass { background: var(--surface-1); }
+}
+.lift { transition: transform .16s cubic-bezier(.2,0,0,1), box-shadow .16s, border-color .16s; }
+.lift:hover { transform: translateY(-1px); border-color: var(--hairline-strong); box-shadow: var(--card-highlight), var(--shadow-e2); }
+
+/* button interaction states (inline styles can't do :hover/:active) */
+.btn-x:active { transform: translateY(1px) scale(.99); }
+.btn-p:hover { filter: brightness(1.07); box-shadow: 0 6px 20px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,.18); transform: translateY(-1px); }
+.btn-s:hover { border-color: var(--ink-subtle); background: var(--surface-3); }
+.btn-g:hover { color: var(--ink); background: var(--surface-2); }
+
+/* data-table row hover */
+.trow { transition: background .12s ease; }
+.trow:hover td { background: var(--surface-2); }

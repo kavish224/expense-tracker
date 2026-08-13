@@ -1,0 +1,13 @@
+{
+  "regions": ["sin1"],
+  "crons": [
+    {
+      "path": "/api/ingest/gmail/poll",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/notify/daily-summary",
+      "schedule": "30 2 * * *"
+    }
+  ]
+}

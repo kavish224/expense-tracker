@@ -1,0 +1,223 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AccountType {
+  BANK
+  CREDIT_CARD
+  CASH
+}
+
+enum Direction {
+  DEBIT
+  CREDIT
+}
+
+// EXPENSE: money leaving to a third party (a real spend). TRANSFER: money
+// moving between two of the user's own accounts — most commonly paying a
+// credit card bill from a bank account. A transfer is never counted as spend
+// (the original card swipe was already the expense); see transferAccountId
+// on Transaction for the counterparty account.
+enum TransactionKind {
+  EXPENSE
+  TRANSFER
+}
+
+enum PaymentRail {
+  UPI
+  NEFT
+  RTGS
+  IMPS
+  CARD
+  CASH
+  OTHER
+}
+
+enum TxnSource {
+  MANUAL
+  EMAIL
+  IMPORT
+  MANUAL_IMPORT
+  LLM
+  AA
+}
+
+enum BudgetPeriod {
+  MONTHLY
+  WEEKLY
+}
+
+enum SourceFormat {
+  CSV
+  XLSX
+  PDF
+  EMAIL
+}
+
+enum TieOutStatus {
+  BALANCED
+  UNBALANCED
+  NA
+}
+
+enum ImportStatus {
+  PENDING
+  COMMITTED
+}
+
+model User {
+  id                   String        @id // Clerk user id (e.g. "user_xxx"), not locally generated
+  email                String        @unique
+  createdAt            DateTime      @default(now())
+  accounts             Account[]
+  categories           Category[]
+  transactions         Transaction[]
+  budgets              Budget[]
+  rules                Rule[]
+  imports              ImportBatch[]
+  templates            BankTemplate[]
+  gmailRefreshToken    String?   // set via the in-app OAuth connect flow (app/api/gmail/oauth); cleared on invalid_grant so the UI can prompt reconnect
+  gmailEmail           String?
+  gmailConnectedAt     DateTime?
+  gmailNeedsReconnect  Boolean   @default(false)
+}
+
+model Account {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  type           AccountType
+  institution    String?
+  identifierHint String?
+  currency       String        @default("INR")
+  openingBalance Decimal       @default(0) @db.Decimal(14, 2)
+  colorToken     String        @default("misc")
+  icon           String        @default("card")
+  isArchived     Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  transactions   Transaction[]
+  transferTransactions Transaction[] @relation("TransferCounterparty")
+  imports        ImportBatch[]
+
+  @@index([userId])
+}
+
+model Category {
+  id           String        @id @default(cuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  parentId     String?
+  colorToken   String        @default("misc")
+  icon         String        @default("dot")
+  isSystem     Boolean       @default(true)
+  transactions Transaction[]
+  budgets      Budget[]
+
+  @@index([userId])
+}
+
+model Transaction {
+  id             String      @id @default(cuid())
+  userId         String
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId      String
+  account        Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  kind           TransactionKind @default(EXPENSE)
+  transferAccountId String?
+  transferAccount   Account?  @relation("TransferCounterparty", fields: [transferAccountId], references: [id], onDelete: SetNull)
+  direction      Direction   @default(DEBIT)
+  amount         Decimal     @db.Decimal(14, 2)
+  currency       String      @default("INR")
+  txnDatetime    DateTime
+  categoryId     String?
+  category       Category?   @relation(fields: [categoryId], references: [id])
+  merchantName   String?
+  counterpartyRaw String?
+  paymentRail    PaymentRail @default(OTHER)
+  externalRef    String?
+  instrumentHint String?
+  note           String?
+  source         TxnSource   @default(MANUAL)
+  confidence     Float       @default(1)
+  isReviewed     Boolean     @default(true)
+  rawNarration   String?
+  feesFlag       Boolean     @default(false)
+  refundFlag     Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([userId, txnDatetime])
+  @@index([externalRef, amount, txnDatetime, accountId])
+  @@index([accountId])
+  @@index([transferAccountId])
+}
+
+model Budget {
+  id         String       @id @default(cuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId String?
+  category   Category?    @relation(fields: [categoryId], references: [id])
+  period     BudgetPeriod @default(MONTHLY)
+  amount     Decimal      @db.Decimal(14, 2)
+  startDate  DateTime     @default(now())
+  rollover   Boolean      @default(false)
+
+  @@index([userId])
+}
+
+model Rule {
+  id            String  @id @default(cuid())
+  userId        String
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  matchType     String
+  matchValue    String
+  setCategoryId String?
+  priority      Int     @default(0)
+
+  @@index([userId])
+}
+
+model ImportBatch {
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId      String
+  account        Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  sourceFormat   SourceFormat
+  bankTemplateId String?
+  fileName       String
+  rowCount       Int          @default(0)
+  tieOutStatus   TieOutStatus @default(NA)
+  status         ImportStatus @default(PENDING)
+  createdAt      DateTime     @default(now())
+
+  @@index([userId])
+}
+
+model BankTemplate {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  institution String
+  mappingJson String
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Tracks which Gmail messages the poller has already looked at, so a read-only OAuth
+// scope is enough — dedup lives here instead of writing a "processed" label back to
+// Gmail (which would require the broader gmail.modify scope).
+model GmailProcessedMessage {
+  id          String   @id @default(cuid())
+  messageId   String   @unique
+  processedAt DateTime @default(now())
+}
