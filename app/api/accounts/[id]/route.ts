@@ -11,8 +11,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = await req.json().catch(() => ({}));
   const data: any = {};
   for (const k of ["name", "isArchived", "colorToken", "icon", "identifierHint", "institution"]) if (k in body) data[k] = body[k];
+  // currentBalance only applies to manually-tracked accounts (FSD 3.6); a
+  // ledger account's balance is always derived, so a stray value here would
+  // silently drift from what's actually computed from its transactions.
+  if ("currentBalance" in body && typeof body.currentBalance === "number" && Number.isFinite(body.currentBalance)) {
+    if (["INVESTMENT", "LOAN", "OTHER_ASSET"].includes(owned.type)) data.currentBalance = body.currentBalance;
+  }
   const account = await prisma.account.update({ where: { id }, data });
-  return NextResponse.json({ account: { ...account, openingBalance: Number(account.openingBalance) } });
+  return NextResponse.json({ account: { ...account, openingBalance: Number(account.openingBalance), currentBalance: account.currentBalance == null ? null : Number(account.currentBalance) } });
 }
 
 // Archive (soft delete) preserves history.

@@ -178,3 +178,60 @@ export async function mapRowsWithLLM(rawRows: string[]): Promise<LlmMappedRow[] 
     return null; // fail closed → deterministic fallback
   }
 }
+
+const CATEGORY_KEYS = ["food", "grocery", "transport", "shopping", "bills", "health", "entertainment", "misc"] as const;
+const categoryVerifySchema = z.object({
+  category: z.enum(CATEGORY_KEYS),
+  confidence: z.number().min(0).max(1),
+});
+
+/**
+ * Last-resort category verification for a transaction the deterministic pipeline
+ * (rules → merchant history → keyword heuristic) couldn't confidently place —
+ * i.e. it fell all the way through to the "misc" fallback. Mirrors the layered
+ * pattern real enrichment engines use (deterministic/rule layers for the
+ * confident majority, an ML/LLM layer only for the low-confidence tail) rather
+ * than running an LLM call on every transaction.
+ *
+ * Deliberately capped below 1: this is a *suggestion* to narrow the review
+ * queue's guess, not a certainty — the caller must still leave the transaction
+ * unreviewed (isReviewed only ever flips true at confidence >= 1). Returns null
+ * when disabled, the call fails, or the model itself wasn't confident (mirrors
+ * mapRowsWithLLM's fail-closed contract).
+ */
+export async function verifyCategoryWithLLM(input: {
+  merchantName?: string;
+  narration?: string;
+  amount?: number;
+}): Promise<{ categoryKey: string; confidence: number } | null> {
+  if (!isLlmEnabled()) return null;
+  if (!input.merchantName && !input.narration) return null;
+  const model = resolveLlmModel();
+
+  const sys =
+    "Classify a single Indian bank/card/UPI transaction into exactly one category: " +
+    "food, grocery, transport, shopping, bills, health, entertainment, or misc. " +
+    "Use misc when the merchant/narration genuinely doesn't indicate a clear category — " +
+    "do not guess confidently just to avoid misc. confidence is 0..1, reflecting how sure " +
+    "you are, given only a merchant name/narration and amount with no other context.";
+  const prompt = `Merchant: ${redact(input.merchantName || "(unknown)")}\nNarration: ${redact(input.narration || "(none)")}\nAmount: ₹${input.amount ?? "?"}`;
+
+  try {
+    const { output } = await generateText({
+      model,
+      temperature: 0,
+      output: Output.object({ schema: categoryVerifySchema }),
+      system: sys,
+      prompt,
+    });
+    if (!output || output.category === "misc") return null;
+    // Capped just above the review queue's 0.5 "low confidence" threshold: this
+    // moves the transaction from a bare guess to a specific AI-suggested category
+    // (better starting point at review time) without ever reaching the
+    // rule/keyword confidence tiers or the confidence>=1 auto-skip-review path.
+    return { categoryKey: output.category, confidence: Math.min(0.55, Math.max(0.5, output.confidence)) };
+  } catch (err) {
+    console.error("Category verification LLM call failed:", err);
+    return null; // fail closed → caller keeps the deterministic misc guess
+  }
+}

@@ -11,6 +11,7 @@ type Period = "week" | "month" | "quarter" | "custom";
 interface Analytics {
   kpis: { totalSpent: number; count: number; avgPerDay: number; topCategory: { key: string; amount: number } | null };
   categories: { id: string; name: string; colorToken: string; amount: number }[];
+  merchants: { name: string; colorToken: string; amount: number; count: number }[];
   accounts: { accountId: string; name: string; amount: number }[];
   daily: { date: string; amount: number }[];
   recurring: { merchant: string; amount: number; count: number }[];
@@ -182,6 +183,33 @@ export default function AnalyticsPage() {
 
         {/* Accounts + insights */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <Card style={{ padding: 18 }}>
+            <Overline style={{ marginBottom: 14 }}>Top merchants</Overline>
+            {!data ? <Skeleton h={140} /> : data.merchants.length === 0 ? (
+              <div style={{ fontSize: 13, color: "var(--ink-subtle)", padding: "6px 0" }}>No spending this period yet.</div>
+            ) : (
+              <>
+                {data.merchants.map((m, i) => {
+                  const pct = data.merchants[0].amount > 0 ? (m.amount / data.merchants[0].amount) * 100 : 0;
+                  return (
+                    <div key={m.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: i < data.merchants.length - 1 ? "1px solid var(--hairline)" : "none" }}>
+                      <Dot token={m.colorToken} size={8} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, fontWeight: 600, gap: 8 }}>
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</span>
+                          <span className="num" style={{ flex: "none" }}>{formatINR(m.amount)}</span>
+                        </div>
+                        <div style={{ height: 4, background: "var(--surface-2)", borderRadius: 999, overflow: "hidden", marginTop: 5 }}>
+                          <span style={{ display: "block", width: `${pct}%`, height: "100%", background: cssVar(m.colorToken), borderRadius: 999 }} />
+                        </div>
+                      </div>
+                      <span style={{ fontSize: 11, color: "var(--ink-subtle)", flex: "none" }}>×{m.count}</span>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </Card>
           <Card style={{ padding: 18 }}>
             <Overline style={{ marginBottom: 14 }}>By account</Overline>
             {!data ? <Skeleton h={100} /> : data.accounts.map((a) => (

@@ -25,6 +25,7 @@ const NAV = [
   { href: "/transactions", label: "Transactions", key: "T", icon: "≣" },
   { href: "/analytics", label: "Analytics", key: "A", icon: "▤" },
   { href: "/accounts", label: "Accounts", key: "C", icon: "▦" },
+  { href: "/networth", label: "Net Worth", key: "N", icon: "◈" },
   { href: "/import", label: "Import", key: "I", icon: "↥" },
   { href: "/settings", label: "Settings", key: "S", icon: "⚙" },
 ];

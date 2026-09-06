@@ -9,7 +9,7 @@ interface T {
   account: { id: string; name: string; colorToken: string };
   category: { id: string; name: string; colorToken: string; icon: string } | null;
   transferAccount: { id: string; name: string } | null;
-  source: string; txnDatetime: string;
+  source: string; txnDatetime: string; confidence: number;
 }
 
 export function HomeClient({
@@ -68,6 +68,7 @@ export function HomeClient({
                     <div style={{ fontSize: 14, fontWeight: 600 }}>
                       {t.merchantName ?? (t.kind === "TRANSFER" ? `Payment to ${t.transferAccount?.name ?? "card"}` : "Transaction")}
                       {t.kind === "TRANSFER" && <span style={{ marginLeft: 8, fontSize: 10, color: "var(--ink-muted)", background: "var(--surface-2)", padding: "1px 6px", borderRadius: 999 }}>payment</span>}
+                      {t.confidence < 0.5 && <span style={{ marginLeft: 8, fontSize: 10, color: "var(--neg)", background: "var(--neg-tint)", padding: "1px 6px", borderRadius: 999 }}>low confidence</span>}
                     </div>
                     <div style={{ fontSize: 12, color: "var(--ink-subtle)" }}>{t.account.name} · {t.source === "EMAIL" ? "email alert" : "imported"}</div>
                   </div>

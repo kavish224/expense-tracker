@@ -73,6 +73,21 @@ const RE_BOILERPLATE = /\b(card holder|bank account|support you|click here|messa
 // (found via a real SBI Rewardz monthly e-statement misparsed as a ₹200 debit).
 const RE_RATE_DESCRIPTOR = /\b(?:per|every)\s+(?:rs\.?|inr|₹)?\s*[\d,]+(?:\.\d+)?\s+spent\b/i;
 
+// E-commerce/food-delivery order confirmations and shipping-status emails are
+// itemized receipts, not bank/wallet alerts — but their "bill breakdown" tables
+// (delivery fee, platform fee, taxes, a "Paid ... ₹X" line summarizing an order
+// that was already paid for) satisfy the amount+verb proximity check above just
+// as well as a real debit alert. Found via two real false positives: a Swiggy
+// "your order was delivered" email and a Myntra order-confirmation email, both
+// fabricating a transaction (with a nonsense merchant name lifted from nearby
+// prose) purely from their receipt table. Deliberately excludes generic terms
+// like "bill details" / "order id" — a genuine Swiggy Dineout *payment
+// confirmation* email (a real transaction) contains both, so only terms
+// specific to an order/delivery/shipping flow (never present in a "your
+// payment was successful" confirmation) are used here.
+const RE_ORDER_RECEIPT =
+  /\b(price breakup|order journey|order (?:is )?confirmed|item\(s\) will reach you|sold by|delivered on time|shipping charges|estimated delivery|track your order|mrp)\b/i;
+
 // Credit card bill payment alerts (bank-side "we received your payment" or
 // "auto-debit towards your card" messages) — these move money from a bank
 // account to pay down a credit card, not a new expense. Tuned against the
@@ -103,6 +118,7 @@ function extractMerchant(text: string, narrationCounterparty?: string): string |
 
 export function parseAlertEmail(body: string, subject = "", sender = ""): ParsedAlert | null {
   const text = `${subject}\n${body}`.replace(/\s+/g, " ").trim();
+  if (RE_ORDER_RECEIPT.test(text)) return null; // merchant receipt, not a bank alert
 
   let amount: number | undefined;
   let direction: "DEBIT" | "CREDIT" | undefined;

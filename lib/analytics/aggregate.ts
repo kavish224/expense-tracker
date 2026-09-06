@@ -1,5 +1,6 @@
 // Analytics aggregations (FSD 3.4). Pure functions over a normalised txn list so
 // they are unit-testable and reused by the API + export.
+import { normalizeMerchant } from "@/lib/parsing/merchant";
 
 export interface TxnLite {
   amount: number;
@@ -77,10 +78,16 @@ export function dailySeries(txns: TxnLite[], start: Date, end: Date) {
 
 // Recurring detection: same merchant, similar amount, ~monthly cadence, ≥2 hits.
 export function recurring(txns: TxnLite[]) {
+  // Grouped on the normalized display name, not the raw narration — the same
+  // merchant routinely shows up under several different raw strings (a UPI VPA
+  // handle changes per transaction, e.g. "zepto.payu@hdfcbank" vs
+  // "zeptomarketplac895229.rzp@rxairtel" are both Zepto), which would otherwise
+  // split one genuinely recurring merchant into several one-off groups that
+  // never reach the count>=2 threshold below.
   const groups = new Map<string, TxnLite[]>();
   for (const t of spends(txns)) {
     if (!t.merchantName) continue;
-    const k = t.merchantName.toLowerCase();
+    const k = normalizeMerchant(t.merchantName).toLowerCase();
     (groups.get(k) || groups.set(k, []).get(k)!).push(t);
   }
   const out: { merchant: string; amount: number; count: number }[] = [];
@@ -89,7 +96,7 @@ export function recurring(txns: TxnLite[]) {
       const amounts = list.map((t) => t.amount);
       const avg = amounts.reduce((a, b) => a + b, 0) / amounts.length;
       const stable = amounts.every((a) => Math.abs(a - avg) / avg < 0.15);
-      if (stable) out.push({ merchant: list[0].merchantName!, amount: round(avg), count: list.length });
+      if (stable) out.push({ merchant: normalizeMerchant(list[0].merchantName), amount: round(avg), count: list.length });
     }
   });
   return out.sort((a, b) => b.count - a.count);

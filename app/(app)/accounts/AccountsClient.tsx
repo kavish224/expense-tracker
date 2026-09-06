@@ -7,11 +7,14 @@ import { useShell } from "@/components/AppShell";
 interface Acc {
   id: string; name: string; type: string; colorToken: string; icon: string;
   identifierHint?: string | null; institution?: string | null; spent: number; count: number;
+  currentBalance?: number | null;
 }
+
+const MANUAL_TYPES = new Set(["INVESTMENT", "LOAN", "OTHER_ASSET"]);
 
 // Shared shape for both the "add new" and "edit existing" modal — same fields
 // either way, only the submit target (POST vs PATCH) differs.
-interface FormState { id?: string; name: string; type: string; institution: string; identifierHint: string }
+interface FormState { id?: string; name: string; type: string; institution: string; identifierHint: string; currentBalance: string }
 
 export function AccountsClient({ accounts }: { accounts: Acc[] }) {
   const router = useRouter();
@@ -20,21 +23,23 @@ export function AccountsClient({ accounts }: { accounts: Acc[] }) {
   const [saving, setSaving] = useState(false);
 
   function openAdd() {
-    setForm({ name: "", type: "CREDIT_CARD", institution: "", identifierHint: "" });
+    setForm({ name: "", type: "CREDIT_CARD", institution: "", identifierHint: "", currentBalance: "" });
   }
   function openEdit(a: Acc) {
-    setForm({ id: a.id, name: a.name, type: a.type, institution: a.institution ?? "", identifierHint: a.identifierHint ?? "" });
+    setForm({ id: a.id, name: a.name, type: a.type, institution: a.institution ?? "", identifierHint: a.identifierHint ?? "", currentBalance: a.currentBalance != null ? String(a.currentBalance) : "" });
   }
 
   async function save() {
     if (!form || !form.name || saving) return;
     setSaving(true);
     try {
+      const icon = { BANK: "🏦", CASH: "💵", INVESTMENT: "📈", LOAN: "🏷️", OTHER_ASSET: "💎" }[form.type] ?? "💳";
       const payload = {
         name: form.name, type: form.type,
         institution: form.institution || undefined,
         identifierHint: form.identifierHint || undefined,
-        colorToken: "misc", icon: form.type === "BANK" ? "🏦" : form.type === "CASH" ? "💵" : "💳",
+        colorToken: "misc", icon,
+        currentBalance: MANUAL_TYPES.has(form.type) ? Number(form.currentBalance || 0) : undefined,
       };
       const res = form.id
         ? await fetch(`/api/accounts/${form.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
@@ -60,7 +65,8 @@ export function AccountsClient({ accounts }: { accounts: Acc[] }) {
     }
   }
 
-  const label = (t: string) => (t === "BANK" ? "Bank" : t === "CREDIT_CARD" ? "Credit card" : "Cash");
+  const label = (t: string) =>
+    ({ BANK: "Bank", CREDIT_CARD: "Credit card", CASH: "Cash", INVESTMENT: "Investment", LOAN: "Loan", OTHER_ASSET: "Other asset" }[t] ?? t);
 
   return (
     <div style={{ maxWidth: 820, margin: "0 auto", padding: "24px 18px 40px" }}>
@@ -79,9 +85,19 @@ export function AccountsClient({ accounts }: { accounts: Acc[] }) {
                 <div style={{ fontSize: 12, color: "var(--ink-subtle)" }}>{label(a.type)}{a.identifierHint ? ` · ••${a.identifierHint}` : ""}</div>
               </div>
             </div>
-            <div className="overline" style={{ fontSize: 10 }}>This month</div>
-            <div className="num" style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em" }}>{formatINR(a.spent)}</div>
-            <div style={{ fontSize: 12, color: "var(--ink-subtle)", marginTop: 2 }}>{a.count} transactions</div>
+            {MANUAL_TYPES.has(a.type) ? (
+              <>
+                <div className="overline" style={{ fontSize: 10 }}>{a.type === "LOAN" ? "Amount owed" : "Current balance"}</div>
+                <div className="num" style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em" }}>{formatINR(a.currentBalance ?? 0)}</div>
+                <div style={{ fontSize: 12, color: "var(--ink-subtle)", marginTop: 2 }}>Manually tracked</div>
+              </>
+            ) : (
+              <>
+                <div className="overline" style={{ fontSize: 10 }}>This month</div>
+                <div className="num" style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em" }}>{formatINR(a.spent)}</div>
+                <div style={{ fontSize: 12, color: "var(--ink-subtle)", marginTop: 2 }}>{a.count} transactions</div>
+              </>
+            )}
             <div style={{ display: "flex", gap: 14, marginTop: 14 }}>
               <button onClick={() => openEdit(a)} style={{ background: "none", border: "none", color: "var(--accent)", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: 0 }}>Edit</button>
               {a.type !== "CASH" && <button onClick={() => archive(a.id)} style={{ background: "none", border: "none", color: "var(--ink-subtle)", fontSize: 12, cursor: "pointer", padding: 0 }}>Archive</button>}
@@ -100,8 +116,11 @@ export function AccountsClient({ accounts }: { accounts: Acc[] }) {
               <option value="CREDIT_CARD">Credit card</option>
               <option value="BANK">Bank</option>
               <option value="CASH">Cash</option>
+              <option value="INVESTMENT">Investment</option>
+              <option value="LOAN">Loan</option>
+              <option value="OTHER_ASSET">Other asset</option>
             </select>
-            {form.type !== "CASH" && (
+            {form.type !== "CASH" && !MANUAL_TYPES.has(form.type) && (
               <>
                 <input value={form.institution} onChange={(e) => setForm({ ...form, institution: e.target.value })} placeholder="Bank name (e.g. hdfcbank)"
                   style={inputStyle} />
@@ -110,6 +129,15 @@ export function AccountsClient({ accounts }: { accounts: Acc[] }) {
                 </div>
                 <input value={form.identifierHint} onChange={(e) => setForm({ ...form, identifierHint: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="Last 4 digits (optional, most accurate)"
                   style={{ ...inputStyle, marginBottom: 16 }} />
+              </>
+            )}
+            {MANUAL_TYPES.has(form.type) && (
+              <>
+                <input value={form.currentBalance} onChange={(e) => setForm({ ...form, currentBalance: e.target.value.replace(/[^0-9.]/g, "") })}
+                  placeholder={form.type === "LOAN" ? "Amount owed" : "Current balance"} inputMode="decimal" style={inputStyle} />
+                <div style={{ fontSize: 11.5, color: "var(--ink-subtle)", margin: "-6px 0 16px" }}>
+                  {form.type === "LOAN" ? "Enter as a positive amount — counted against your net worth." : "Not fed by transactions — update this whenever the real value changes."}
+                </div>
               </>
             )}
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>

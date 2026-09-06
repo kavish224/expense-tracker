@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { kpis, dailySeries, recurring, byAccount, periodRange, type TxnLite } from "./aggregate";
+import { normalizeMerchant } from "@/lib/parsing/merchant";
 
 export type Period = "week" | "month" | "quarter" | "custom";
 
@@ -38,6 +39,22 @@ export async function computeAnalytics(userId: string, period: Period, customRan
   }
   const categories = [...catMap.values()].map((c) => ({ ...c, amount: round(c.amount) })).sort((a, b) => b.amount - a.amount);
 
+  // Merchant breakdown — grouped on the normalized display name (raw bank/UPI narrations
+  // like "SWIGGY*ORD8827BLR" would otherwise fragment the same real merchant into many rows).
+  const merchMap = new Map<string, { name: string; colorToken: string; amount: number; count: number }>();
+  for (const t of rows) {
+    if (t.direction !== "DEBIT") continue;
+    const name = normalizeMerchant(t.merchantName);
+    const cur = merchMap.get(name) ?? { name, colorToken: t.category?.colorToken ?? "misc", amount: 0, count: 0 };
+    cur.amount += Number(t.amount);
+    cur.count += 1;
+    merchMap.set(name, cur);
+  }
+  const merchants = [...merchMap.values()]
+    .map((m) => ({ ...m, amount: round(m.amount) }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 8);
+
   // budgets vs actual
   const budgets = await prisma.budget.findMany({ where: { userId }, include: { category: true } });
   const totalSpent = txns.filter((t) => t.direction === "DEBIT").reduce((a, t) => a + t.amount, 0);
@@ -57,6 +74,7 @@ export async function computeAnalytics(userId: string, period: Period, customRan
     range: { start, end },
     kpis: kpis(txns, days),
     categories,
+    merchants,
     accounts: byAccount(txns),
     daily: dailySeries(txns, start, end),
     recurring: recurring(txns).slice(0, 4),

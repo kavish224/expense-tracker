@@ -3,6 +3,7 @@ import { parseNarration } from "@/lib/parsing/narration";
 import { tieOut, type TieRow } from "@/lib/parsing/tieout";
 import { dedup, nameSimilarity, type DedupExisting } from "@/lib/parsing/dedup";
 import { categorize } from "@/lib/parsing/categorize";
+import { normalizeMerchant } from "@/lib/parsing/merchant";
 import { detectColumns, extractRow, looksLikeHeader } from "@/lib/parsing/columns";
 import { extractDate } from "@/lib/parsing/date";
 
@@ -153,8 +154,39 @@ describe("categorize", () => {
     expect(r.confidence).toBeLessThan(0.5);
   });
   test("rule beats heuristic", () => {
-    const r = categorize({ merchantName: "Swiggy" }, [{ matchType: "MERCHANT_CONTAINS", matchValue: "swiggy", setCategoryKey: "entertainment", priority: 10 }]);
+    const r = categorize(
+      { merchantName: "Swiggy" },
+      [{ matchType: "MERCHANT_CONTAINS", matchValue: "swiggy", setCategoryId: "cat_entertainment", priority: 10 }],
+      new Map([["cat_entertainment", "entertainment"]])
+    );
     expect(r.categoryKey).toBe("entertainment");
+  });
+  test("merchant history beats keyword heuristic but loses to a rule", () => {
+    const history = new Map([["swiggy", "entertainment"]]);
+    const r = categorize({ merchantName: "Swiggy" }, [], undefined, history);
+    expect(r.categoryKey).toBe("entertainment");
+    expect(r.confidence).toBe(0.75);
+    const withRule = categorize(
+      { merchantName: "Swiggy" },
+      [{ matchType: "MERCHANT_CONTAINS", matchValue: "swiggy", setCategoryId: "cat_food", priority: 10 }],
+      new Map([["cat_food", "food"]]),
+      history
+    );
+    expect(withRule.categoryKey).toBe("food");
+    expect(withRule.confidence).toBe(1);
+  });
+});
+
+describe("normalizeMerchant", () => {
+  test("strips UPI/rail prefixes and VPA handles before matching", () => {
+    expect(normalizeMerchant("UPI-SWIGGY-9821XXXXXX@YBL")).toBe("Swiggy");
+    expect(normalizeMerchant("POS AMAZON PAY INDIA PVT LTD")).toBe("Amazon");
+  });
+  test("cleans an unlisted merchant's noise instead of showing it raw", () => {
+    expect(normalizeMerchant("UPI-JOHN DOE ENTERPRISES@OKHDFCBANK")).toBe("John Doe Enterprises");
+  });
+  test("strips trailing DR/CR markers", () => {
+    expect(normalizeMerchant("SOME MERCHANT DR")).toBe("Some Merchant");
   });
 });
 

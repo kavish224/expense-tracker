@@ -58,7 +58,11 @@ export async function requireUserIdApi(): Promise<string | null> {
 
 export async function getShellData(userId: string) {
   const [accounts, categories] = await Promise.all([
-    prisma.account.findMany({ where: { userId, isArchived: false }, orderBy: { createdAt: "asc" } }),
+    // Manually-tracked net-worth accounts (INVESTMENT/LOAN/OTHER_ASSET, FSD 3.6)
+    // carry no transaction ledger — excluded here so quick-add/command-palette
+    // never let a transaction post against one and silently vanish from every
+    // balance/analytics view that reads the ledger instead.
+    prisma.account.findMany({ where: { userId, isArchived: false, type: { in: ["BANK", "CREDIT_CARD", "CASH"] } }, orderBy: { createdAt: "asc" } }),
     prisma.category.findMany({ where: { userId }, orderBy: { name: "asc" } }),
   ]);
   return {

@@ -46,13 +46,14 @@ Next.js (App Router, TS)
 Entities and key fields (full schema in `prisma/schema.prisma`):
 
 - **User** — `id (Clerk user id, not locally generated), email(unique), createdAt`.
-- **Account** — `id, userId, name, type(BANK|CREDIT_CARD|CASH), institution?, identifierHint?(last4/VPA), currency(default INR), openingBalance, colorToken, icon, isArchived`.
+- **Account** — `id, userId, name, type(BANK|CREDIT_CARD|CASH|INVESTMENT|LOAN|OTHER_ASSET), institution?, identifierHint?(last4/VPA), currency(default INR), openingBalance, currentBalance?(manual accounts only — see 3.6), colorToken, icon, isArchived`.
 - **Category** — `id, userId, name, parentId?, colorToken, icon, isSystem`.
 - **Transaction** — `id, userId, accountId, direction(DEBIT|CREDIT), amount(Decimal), currency, txnDatetime, categoryId?, merchantName?, counterpartyRaw?, paymentRail(UPI|NEFT|RTGS|IMPS|CARD|CASH|OTHER), externalRef?(UTR/RRN/UPI id — dedup key), instrumentHint?(VPA/last4), note?, source(MANUAL|EMAIL|IMPORT|MANUAL_IMPORT|LLM|AA), confidence(0..1), isReviewed(bool), rawNarration?, feesFlag, refundFlag, createdAt, updatedAt`. Indexes on `(userId, txnDatetime)`, `(externalRef, amount, txnDatetime, accountId)` for dedup.
 - **Budget** — `id, userId, categoryId?(null=overall), period(MONTHLY|WEEKLY), amount, startDate, rollover`.
 - **Rule** — `id, userId, matchType(MERCHANT_CONTAINS|VPA_EQUALS|AMOUNT_RANGE|ACCOUNT), matchValue, setCategoryId?, priority`.
 - **ImportBatch** — `id, userId, accountId, sourceFormat(CSV|XLSX|PDF|EMAIL), bankTemplateId?, fileName, rowCount, tieOutStatus(BALANCED|UNBALANCED|NA), status(PENDING|COMMITTED), createdAt`.
 - **BankTemplate** — `id, userId, institution, mappingJson, createdAt` (learned column mapping reused per bank).
+- **BalanceSnapshot** — `id, userId, accountId, balance(Decimal), asOf(DateTime), createdAt` — point-in-time balance record for an account, used to build the net-worth trend (§3.6).
 
 Enums are Postgres enums via Prisma. Money stored as `Decimal(14,2)`. `rawNarration` retained for audit/re-parse. `confidence + isReviewed` drive the review queue.
 
@@ -83,6 +84,17 @@ Enums are Postgres enums via Prisma. Money stored as `Decimal(14,2)`. `rawNarrat
 - `ensureLocalUser()` — on a user's first authenticated request, upserts a local `User` row keyed by the Clerk user id (email pulled from Clerk) and runs `bootstrapNewUser()` (default categories + a Cash account), so a brand-new sign-up isn't dropped into an empty app.
 - `/login` and `/register` render Clerk's hosted `<SignIn/>`/`<SignUp/>` components (catch-all routes under `app/(auth)/`). `/api/ingest/*` remain public — token-protected via `INGEST_TOKEN`/`CRON_SECRET` in the route handler itself, not Clerk sessions, since their callers (email forwarders, Vercel Cron) have no Clerk session to present.
 
+### 3.6 Net worth (`lib/networth`)
+Tracks all of the user's money, not just spend-tracked accounts — the goal is one number that answers "what am I worth right now," plus a trend over time. Deliberately scoped to **manual entry**, not live bank aggregation: India's automated equivalent (the RBI Account Aggregator framework — Setu/Finvu/OneMoney/CAMSFinServ) requires the app to register as a regulated FIU, which is out of scope for this project. Existing `EMAIL`/`LLM`-sourced transaction ingestion (§3.3) already keeps `BANK`/`CASH`/`CREDIT_CARD` balances live without that; net worth extends coverage to the accounts nothing can auto-feed.
+
+- **Three new `AccountType` values** — `INVESTMENT`, `LOAN`, `OTHER_ASSET` — for money/property that isn't fed by transaction ingestion (brokerage/MF holdings, a loan owed, real estate, jewelry, etc). These accounts carry a manually-entered `Account.currentBalance` instead of a transaction ledger.
+- **`computeAccountBalances(userId)`** (`lib/networth/service.ts`) — the current balance per account, one formula per account class:
+  - **Ledger accounts** (`BANK`, `CASH`, `CREDIT_CARD`): `openingBalance + Σcredits − Σdebits` on the account itself, **plus** the amount of any `TRANSFER`-kind transaction elsewhere whose `transferAccountId` points at this account (a credit-card bill paid from a bank account is recorded once, on the bank side — see §2 — so the card's own balance has to pick it up via `transferAccountId` or a paid-down card would look like it never got paid). A card that's carrying a balance naturally computes negative; no separate liability flag needed for it.
+  - **Manual accounts** (`INVESTMENT`, `LOAN`, `OTHER_ASSET`): `Account.currentBalance` as entered, most recently, via the account form. `LOAN` is entered as a positive "amount owed" and negated when summed into net worth.
+- **`computeNetWorth(balances)`** (`lib/networth/aggregate.ts`, pure/unit-tested) — signed per-account net-worth contribution (ledger balance as-is; `INVESTMENT`/`OTHER_ASSET` positive; `LOAN` negated), split into `assets`/`liabilities` by sign, `totalAssets − totalLiabilities = netWorth`.
+- **`BalanceSnapshot`** — a `POST /api/networth/snapshot` action stores the current balance of every non-archived account, timestamped; `netWorthSeries()` sums each snapshot batch (by `asOf` day, with the same sign convention) into a `{date, netWorth}` series for the trend chart. Snapshots are additive history, never overwritten — recomputing current balances never touches them.
+- **Screen** (`/networth`) — hero net-worth number + trend line (from snapshots), assets vs. liabilities breakdown, per-account list, "Update balance" for manual accounts, "Snapshot now" to checkpoint the trend.
+
 ## 4. API surface (representative)
 
 | Method | Path | Purpose |
@@ -97,6 +109,8 @@ Enums are Postgres enums via Prisma. Money stored as `Decimal(14,2)`. `rawNarrat
 | POST | `/api/import/commit` | commit reviewed rows (merge dups) |
 | POST | `/api/ingest/email` | email alert intake (gated/token) |
 | GET | `/api/analytics?period=` | KPIs, series, category/account breakdown, budgets |
+| GET | `/api/networth` | current balances, assets/liabilities totals, trend series |
+| POST | `/api/networth/snapshot` | checkpoint every account's current balance into `BalanceSnapshot` |
 | GET | `/api/export?type=csv\|pdf` | export |
 
 All responses JSON; amounts as strings (Decimal-safe); errors `{error, code}`.
@@ -109,7 +123,8 @@ All responses JSON; amounts as strings (Decimal-safe); errors `{error, code}`.
 - **Transactions** — filter bar (account/category/period/text), sortable table, density toggle, inline edit, multiselect bulk categorize, `/` search, keyboard row nav.
 - **Import** — 5-step: source→detect→map(confirm/remembered)→parse→review. Tie-out banner (balanced ✓ / off-by ⚠), confidence tags, dedup side-by-side (merge/keep-both), bulk-accept verified.
 - **Analytics** — KPI card row → category bars → spending calendar heatmap → trend line → account breakdown → budgets vs actual → insight cards → period segmented control → export buttons.
-- **Accounts** — account cards (glyph, name, last4, month spend, sparkline), add/archive, per-account drill.
+- **Accounts** — account cards (glyph, name, last4, month spend, sparkline), add/archive, per-account drill. Includes `INVESTMENT`/`LOAN`/`OTHER_ASSET` types, which show/edit a manual current balance instead of month spend.
+- **Net worth** — hero total (assets − liabilities) + trend line, assets/liabilities breakdown, per-account balances, "Update balance" (manual accounts), "Snapshot now".
 
 All screens: dark default + light; loading (skeleton), empty (illustration + CTA), error (card-scoped banner + retry) states.
 

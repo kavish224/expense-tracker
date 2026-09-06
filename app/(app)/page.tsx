@@ -1,6 +1,7 @@
 import { requireUserId } from "@/lib/user";
 import { prisma } from "@/lib/db";
 import { periodRange } from "@/lib/analytics/aggregate";
+import { normalizeMerchant } from "@/lib/parsing/merchant";
 import { HomeClient } from "./HomeClient";
 
 export const dynamic = "force-dynamic";
@@ -50,11 +51,12 @@ export default async function HomePage() {
 
 function ser(t: any) {
   return {
-    id: t.id, amount: Number(t.amount), direction: t.direction, kind: t.kind, merchantName: t.merchantName,
+    id: t.id, amount: Number(t.amount), direction: t.direction, kind: t.kind,
+    merchantName: t.merchantName ? normalizeMerchant(t.merchantName) : t.merchantName,
     account: { id: t.accountId, name: t.account.name, colorToken: t.account.colorToken },
     category: t.category ? { id: t.categoryId, name: t.category.name, colorToken: t.category.colorToken, icon: t.category.icon } : null,
     transferAccount: t.transferAccount ? { id: t.transferAccount.id, name: t.transferAccount.name } : null,
-    source: t.source, txnDatetime: t.txnDatetime,
+    source: t.source, txnDatetime: t.txnDatetime, confidence: t.confidence,
   };
 }
 

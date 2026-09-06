@@ -2,11 +2,11 @@
 // ingest webhook (POST /api/ingest/email) and the live Gmail poller — one place
 // for account resolution, categorization, and transaction creation.
 import { prisma } from "@/lib/db";
-import { categorize } from "@/lib/parsing/categorize";
-import { CATEGORY_BY_KEY } from "@/lib/constants";
+import { loadCategorizationContext, categorizeInContext, categoryIdFor } from "@/lib/parsing/categorizeUser";
 import { dedup, type DedupExisting } from "@/lib/parsing/dedup";
 import type { ParsedAlert } from "@/lib/email/parse";
 import { notifyTransaction } from "@/lib/whatsapp";
+import { verifyCategoryWithLLM } from "@/lib/llm/adapter";
 import type { Account } from "@/generated/prisma/client";
 
 export type IngestResult =
@@ -95,9 +95,17 @@ export async function createTransactionFromAlert(
     return { ok: false, reason: "duplicate", transactionId: dedupResult.matchId };
   }
 
-  const cat = categorize({ merchantName: alert.merchantName });
-  const cats = await prisma.category.findMany({ where: { userId } });
-  const categoryId = cats.find((c) => c.colorToken === (CATEGORY_BY_KEY[cat.categoryKey]?.colorToken ?? "misc"))?.id ?? null;
+  const ctx = await loadCategorizationContext(userId);
+  let cat = categorizeInContext(ctx, { merchantName: alert.merchantName, amount: alert.amount });
+  // Deterministic pipeline (rules → merchant history → keywords) fell all the way
+  // through to the generic misc fallback — worth a single LLM verification call
+  // before this lands in the review queue, since email ingestion is unattended and
+  // this is otherwise the transaction type most likely to sit uncategorized.
+  if (cat.confidence < 0.5) {
+    const verified = await verifyCategoryWithLLM({ merchantName: alert.merchantName, amount: alert.amount });
+    if (verified) cat = verified;
+  }
+  const categoryId = categoryIdFor(ctx, cat);
 
   const txn = await prisma.transaction.create({
     data: {
@@ -113,8 +121,11 @@ export async function createTransactionFromAlert(
       externalRef: alert.externalRef,
       txnDatetime: alert.when,
       source: "EMAIL",
-      confidence: 0.5,
-      isReviewed: false,
+      confidence: cat.confidence,
+      // A matched rule (confidence 1) is a certainty the user already declared —
+      // skip the review queue. Anything else from an unattended email alert still
+      // needs a human glance before it counts toward spend.
+      isReviewed: cat.confidence >= 1,
       rawNarration: rawBody.slice(0, 500),
     },
   });

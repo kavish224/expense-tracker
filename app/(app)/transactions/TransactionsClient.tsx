@@ -7,7 +7,7 @@ import { useShell } from "@/components/AppShell";
 
 interface Txn {
   id: string; amount: number; direction: string; kind: string; txnDatetime: string; merchantName?: string;
-  paymentRail: string; source: string; isReviewed: boolean;
+  paymentRail: string; source: string; isReviewed: boolean; confidence: number;
   account: { id: string; name: string; colorToken: string } | null;
   category: { id: string; name: string; colorToken: string; icon: string } | null;
   transferAccount: { id: string; name: string } | null;
@@ -99,7 +99,7 @@ export function TransactionsClient({ accounts, categories }: { accounts: ShellAc
                 <td style={{ ...td, padding: pad, fontWeight: 600 }}>
                   {t.merchantName ?? (t.kind === "TRANSFER" ? `Payment to ${t.transferAccount?.name ?? "card"}` : "—")}
                   {t.kind === "TRANSFER" && <span style={{ marginLeft: 8, fontSize: 10, color: "var(--ink-muted)", background: "var(--surface-2)", padding: "1px 6px", borderRadius: 999 }}>payment</span>}
-                  {!t.isReviewed && <span style={{ marginLeft: 8, fontSize: 10, color: "var(--warn)", background: "var(--warn-tint)", padding: "1px 6px", borderRadius: 999 }}>review</span>}
+                  {!t.isReviewed && <ReviewBadge confidence={t.confidence} style={{ marginLeft: 8 }} />}
                 </td>
                 <td style={{ ...td, padding: pad }}>{t.category ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Dot token={t.category.colorToken} size={8} />{t.category.name}</span> : <span style={{ color: "var(--ink-subtle)" }}>—</span>}</td>
                 <td style={{ ...td, padding: pad, color: "var(--ink-muted)" }}>{t.account?.name}</td>
@@ -137,7 +137,7 @@ export function TransactionsClient({ accounts, categories }: { accounts: ShellAc
                   {t.merchantName ?? (t.kind === "TRANSFER" ? `Payment to ${t.transferAccount?.name ?? "card"}` : "—")}
                 </span>
                 {t.kind === "TRANSFER" && <span style={{ fontSize: 10, color: "var(--ink-muted)", background: "var(--surface-2)", padding: "1px 6px", borderRadius: 999, flex: "none" }}>payment</span>}
-                {!t.isReviewed && <span style={{ fontSize: 10, color: "var(--warn)", background: "var(--warn-tint)", padding: "1px 6px", borderRadius: 999, flex: "none" }}>review</span>}
+                {!t.isReviewed && <ReviewBadge confidence={t.confidence} style={{ flex: "none" }} />}
               </div>
               <div style={{ fontSize: 12, color: "var(--ink-subtle)", marginTop: 1 }}>
                 {t.account?.name}{t.category && <> · {t.category.name}</>} · {new Date(t.txnDatetime).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
@@ -159,6 +159,23 @@ export function TransactionsClient({ accounts, categories }: { accounts: ShellAc
         }
       `}</style>
     </div>
+  );
+}
+
+// Below ~0.5 confidence, the auto-categorization is little better than a guess (the
+// keyword heuristic's own "unknown" floor is 0.3) — calling that out distinctly from a
+// routine "review" nudge tells the user which unreviewed items are actually worth a look.
+function ReviewBadge({ confidence, style }: { confidence: number; style?: React.CSSProperties }) {
+  const low = confidence < 0.5;
+  return (
+    <span style={{
+      fontSize: 10, padding: "1px 6px", borderRadius: 999,
+      color: low ? "var(--neg)" : "var(--warn)",
+      background: low ? "var(--neg-tint)" : "var(--warn-tint)",
+      ...style,
+    }}>
+      {low ? "low confidence" : "review"}
+    </span>
   );
 }
 

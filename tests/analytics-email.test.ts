@@ -37,6 +37,19 @@ describe("analytics", () => {
     const r = recurring(txns);
     expect(r.find((x) => x.merchant === "Netflix")?.count).toBe(2);
   });
+  // Regression: a real merchant's raw narration varies transaction to transaction
+  // (a UPI VPA handle differs per payment, e.g. "zepto.payu@hdfcbank" vs
+  // "zeptomarketplac895229.rzp@rxairtel" — both really Zepto) — grouping recurring()
+  // on the raw string split one genuinely recurring merchant into several one-off
+  // groups that never reached the count>=2 threshold. Found via live Gmail data.
+  test("recurring groups the same merchant across differing raw VPA narrations", () => {
+    const varied: TxnLite[] = [
+      { amount: 150, direction: "DEBIT", txnDatetime: new Date("2026-07-05"), categoryKey: "food", accountId: "a1", accountName: "ICICI", merchantName: "zepto.payu@hdfcbank" },
+      { amount: 155, direction: "DEBIT", txnDatetime: new Date("2026-07-19"), categoryKey: "food", accountId: "a1", accountName: "ICICI", merchantName: "zeptomarketplac895229.rzp@rxairtel" },
+    ];
+    const r = recurring(varied);
+    expect(r.find((x) => x.merchant === "Zepto")?.count).toBe(2);
+  });
   test("periodRange month starts on the 1st", () => {
     const { start } = periodRange("month", new Date("2026-07-22"));
     expect(start.getDate()).toBe(1);
@@ -127,6 +140,30 @@ describe("email parse + redaction", () => {
       );
       expect(a).toBeNull();
     });
+
+    // Regression: two real false positives found via live Gmail polling — a Swiggy
+    // "your order was delivered" email and a Myntra order-confirmation email, both
+    // fabricating a transaction (nonsense merchant name lifted from nearby prose,
+    // e.g. "you"/"ship") purely from their itemized bill-breakdown table, which
+    // satisfies the amount+verb proximity check just as well as a real debit alert.
+    test("rejects a food-delivery order-delivered email despite its bill breakdown", () => {
+      const a = parseAlertEmail(
+        "Order summary banner ₹182 saved on this order ORDER JOURNEY Rotlo Gujarati Rasthal Order ID: 245170569108612 BILL DETAILS Gujarati Meal Pack Thali. x1 ₹299 Restaurant Packaging ₹10 Platform fee with GST ₹17.58 Discount Applied -₹145 Taxes ₹15.02 Paid Via Split Payment ₹197 Disclaimer: Attached is the invoice for the restaurant services provided by the outlet.",
+        "Your Swiggy order was delivered on time",
+        "noreply@swiggy.in"
+      );
+      expect(a).toBeNull();
+    });
+
+    test("rejects a retailer order-confirmation email despite its price breakup", () => {
+      const a = parseAlertEmail(
+        "Sit Back And Relax. Your M-Now Order Is Confirmed on Sun, 26 Jul We know you can't wait to receive your order! With M-Now, your item(s) will reach you extra fast. Price breakup * MRP * ₹799.00 * Discount * - ₹632.00 * Platform Fee * ₹23.00 * Total Amount * ₹190.00 * Net Paid * ₹190.00 * Sold by: Omnitech Retail. Paid by ICICI Credit Card ending in 4003",
+        "Your M-Now Myntra Order Confirmation.",
+        "updates@myntra.com"
+      );
+      expect(a).toBeNull();
+    });
+
   });
   test("redacts long account and card numbers", () => {
     const r = redact("A/c 123456789012 card 4455123412344455");
@@ -194,6 +231,7 @@ describe("email LLM adapter grounding (groundAlertOutput)", () => {
     return {
       isTransaction: true, amount: 336, direction: "DEBIT" as const, merchantName: "AMAZON PAY WALLET LOAD",
       accountHint: "4003", rail: "CARD" as const, dateText: "Jul 20, 2026",
+      isCreditCardBillPayment: null, cardBeingPaidHint: null, isCreditCardFundedUpi: null,
       ...overrides,
     };
   }
@@ -279,5 +317,32 @@ describe("email LLM adapter grounding (groundAlertOutput)", () => {
       "SBI awards 2 Reward Points per Rs.200 spent* on SBI Debit Card at POS (Point of Sale) or online.";
     const r = groundAlertOutput(output({ amount: 200, dateText: "01/06/2026" }), text, "no-reply@alerts.sbi.bank.in");
     expect(r).toBeNull();
+  });
+
+  // Regression: same false-positive class as parseAlertEmail above — an order/
+  // shipping-confirmation email's itemized bill table grounds cleanly (a real
+  // amount, a real "paid"-shaped keyword nearby), so even a model that says
+  // isTransaction=true (worst case: it was fooled too) must still be rejected
+  // deterministically here.
+  test("rejects a retailer order-confirmation email even if the model says isTransaction=true", () => {
+    const text =
+      "Sit Back And Relax. Your M-Now Order Is Confirmed on Sun, 26 Jul. Price breakup * MRP * ₹799.00 * " +
+      "Platform Fee * ₹23.00 * Total Amount * ₹190.00 * Net Paid * ₹190.00 * Sold by: Omnitech Retail.";
+    const r = groundAlertOutput(output({ amount: 190, merchantName: "Omnitech Retail" }), text, "updates@myntra.com");
+    expect(r).toBeNull();
+  });
+
+  // A genuine payment-confirmation email (e.g. Swiggy Dineout) legitimately contains
+  // "Order ID:" and "Bill Details" — the ORDER_RECEIPT_RE guard must not reject it
+  // just because those generic terms overlap with the order-confirmation false
+  // positive above; it only rejects on terms specific to an order/delivery flow.
+  test("still accepts a genuine payment-confirmation email with its own 'Bill Details'/'Order ID' line", () => {
+    const text =
+      "Hey Kavish Ambani, Stomach full, payment successful! Your Dineout payment of Rs. 278 at Roastery Cultur " +
+      "- The Coffee C was completed. Here's your payment summary: Order ID: 245169022142621 Paid to: Roastery " +
+      "Cultur - The Coffee Company, Bodakdev, Ahmedabad Bill Details Amount Total Bill ₹278";
+    const r = groundAlertOutput(output({ amount: 278, merchantName: "Roastery Cultur - The Coffee Company" }), text, "noreply@swiggy.in");
+    expect(r).not.toBeNull();
+    expect(r!.amount).toBe(278);
   });
 });

@@ -21,14 +21,17 @@ const alertSchema = z.object({
   rail: z.enum(["UPI", "NEFT", "RTGS", "IMPS", "CARD", "CASH", "OTHER"]).nullable(),
   dateText: z.string().nullable(),
   // A credit card bill payment (money moving from a bank account to pay off a
-  // card) rather than a real purchase/expense. Optional (defaults falsy) so
-  // older callers/fixtures that predate this field still type-check.
-  isCreditCardBillPayment: z.boolean().optional(),
+  // card) rather than a real purchase/expense. Nullable rather than .optional():
+  // OpenAI's strict structured-output mode requires every property to appear in
+  // the schema's "required" array (see rowSchema above for the same rule), so
+  // true optionality has to be modeled as "present but null" — an earlier
+  // .optional() here made every LLM call in this adapter fail outright.
+  isCreditCardBillPayment: z.boolean().nullable(),
   // For a bill payment: last 4 digits / name of the card being paid, if stated.
-  cardBeingPaidHint: z.string().nullable().optional(),
+  cardBeingPaidHint: z.string().nullable(),
   // A UPI transaction explicitly funded by a (RuPay) credit card rather than
   // a bank account — same rail (UPI), different funding account.
-  isCreditCardFundedUpi: z.boolean().optional(),
+  isCreditCardFundedUpi: z.boolean().nullable(),
 });
 type AlertOutput = z.infer<typeof alertSchema>;
 
@@ -53,6 +56,16 @@ const PROXIMITY_WINDOW = 120;
 const RATE_DESCRIPTOR_RE =
   /\b(?:per|every)\s+(?:rs\.?|inr|₹)?\s*[\d,]+(?:\.\d+)?\s+spent\b|\bpoints?\s+(?:per|worth)\b/i;
 
+// Same false-positive class as lib/email/parse.ts's RE_ORDER_RECEIPT (see the
+// detailed comment there): an itemized e-commerce/food-delivery receipt (order
+// confirmation, shipping notice) reads enough like a transaction — an amount, a
+// "Paid ..." line — to fool grounding even when the model itself is told to
+// reject non-alerts. Kept as a second, deterministic check here rather than
+// trusting the prompt alone; excludes generic terms ("bill details", "order
+// id") that a genuine payment-confirmation email can legitimately also contain.
+const ORDER_RECEIPT_RE =
+  /\b(price breakup|order journey|order (?:is )?confirmed|item\(s\) will reach you|sold by|delivered on time|shipping charges|estimated delivery|track your order|mrp)\b/i;
+
 // Returns the index of a text occurrence of `amount`, or -1 if none is found.
 function findAmountIndex(amount: number, text: string): number {
   const target2dp = amount.toFixed(2);
@@ -75,6 +88,7 @@ function findAmountIndex(amount: number, text: string): number {
  */
 export function groundAlertOutput(output: AlertOutput, sourceText: string, sender: string): ParsedAlert | null {
   if (!output.isTransaction || output.amount == null || !output.direction) return null;
+  if (ORDER_RECEIPT_RE.test(sourceText)) return null; // merchant receipt, not a bank alert
 
   const amountIdx = findAmountIndex(output.amount, sourceText);
   if (amountIdx === -1) return null; // amount must trace back to real text
@@ -109,7 +123,7 @@ export function groundAlertOutput(output: AlertOutput, sourceText: string, sende
     when,
     kind,
     transferToHint: kind === "TRANSFER" ? (output.cardBeingPaidHint ?? undefined) : undefined,
-    creditCardFunded: output.isCreditCardFundedUpi,
+    creditCardFunded: output.isCreditCardFundedUpi ?? undefined,
   };
 }
 
@@ -128,8 +142,12 @@ export async function parseAlertEmailWithLLM(body: string, subject = "", sender 
     "You extract a single bank/card/UPI transaction alert from an email, if the email genuinely is one. " +
     "Indian bank/wallet alert formats vary widely (HDFC, ICICI, SBI, Bank of Baroda, AU Small Finance, Amazon Pay, " +
     "PhonePe, GPay, Paytm, etc). Set isTransaction=false for anything that is not a real transaction alert — " +
-    "marketing, newsletters, OTPs, statement summaries, promotional 'earn rewards' emails, or a balance/credit-limit " +
-    "notice with no actual transaction. When isTransaction is true: amount must be the exact transacted amount as a " +
+    "marketing, newsletters, OTPs, statement summaries, promotional 'earn rewards' emails, a balance/credit-limit " +
+    "notice with no actual transaction, or an order confirmation / shipping / delivery notification sent by a " +
+    "retailer or food-delivery app (Swiggy, Zomato, Myntra, Amazon, Flipkart, etc) — these are receipts for an " +
+    "order, not a bank/wallet alert, even when they show an itemized price breakdown or a 'Paid ...' line. Only " +
+    "set isTransaction=true when the email is genuinely from a bank, card issuer, or payment/wallet provider " +
+    "confirming money movement into or out of an account. When isTransaction is true: amount must be the exact transacted amount as a " +
     "positive number — never a balance or credit-limit figure appearing elsewhere in the email. direction is DEBIT " +
     "for money out, CREDIT for money in. merchantName is who was paid / who paid, if stated. accountHint is the last " +
     "4 digits of the card/account if stated. rail is the payment rail if inferable. dateText is the transaction date " +

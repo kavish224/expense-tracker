@@ -22,6 +22,7 @@ export default async function AccountsPage() {
     id: a.id, name: a.name, type: a.type, colorToken: a.colorToken, icon: a.icon,
     identifierHint: a.identifierHint, institution: a.institution,
     spent: spendMap.get(a.id)?.spent ?? 0, count: spendMap.get(a.id)?.count ?? 0,
+    currentBalance: a.currentBalance == null ? null : Number(a.currentBalance),
   }));
 
   return <AccountsClient accounts={data} />;

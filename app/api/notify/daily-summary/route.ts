@@ -1,27 +1,7 @@
-import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { authorized } from "@/lib/cron-auth";
 import { isWhatsAppEnabled, notifyDailySummary } from "@/lib/whatsapp";
-
-function tokenMatches(provided: string, expected: string): boolean {
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
-}
-
-// Same dual-caller auth as /api/ingest/gmail/poll: INGEST_TOKEN for manual/local
-// testing, CRON_SECRET for Vercel Cron's `Authorization: Bearer $CRON_SECRET`.
-function authorized(req: NextRequest): boolean {
-  const auth = req.headers.get("authorization") || "";
-  const provided = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  if (!provided) return false;
-  const ingestToken = process.env.INGEST_TOKEN;
-  const cronSecret = process.env.CRON_SECRET;
-  if (ingestToken && tokenMatches(provided, ingestToken)) return true;
-  if (cronSecret && tokenMatches(provided, cronSecret)) return true;
-  return false;
-}
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 

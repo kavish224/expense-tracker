@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { requireUserIdApi } from "@/lib/user";
 import { detectColumns, extractRow, looksLikeHeader, type ColumnMap } from "@/lib/parsing/columns";
 import { parseNarration } from "@/lib/parsing/narration";
-import { categorize } from "@/lib/parsing/categorize";
+import { loadCategorizationContext, categorizeInContext, type CategorizationContext } from "@/lib/parsing/categorizeUser";
 import { tieOut, type TieRow } from "@/lib/parsing/tieout";
 import { dedup, type DedupExisting } from "@/lib/parsing/dedup";
 import { CATEGORY_BY_KEY } from "@/lib/constants";
@@ -104,7 +104,8 @@ function rawLinesForLLM(buf: Buffer, fileName: string, dataRows: (string | numbe
 async function buildRowsFromLLM(
   rawLines: string[],
   accountId: string,
-  existingLite: DedupExisting[]
+  existingLite: DedupExisting[],
+  ctx: CategorizationContext
 ): Promise<{ parsedRows: any[]; tieRows: TieRow[] } | null> {
   const llmRows = await mapRowsWithLLM(rawLines);
   if (!llmRows) return null;
@@ -116,7 +117,7 @@ async function buildRowsFromLLM(
     if (!row.amount || !row.direction) continue;
     const nar = parseNarration(row.narration || "");
     const merchantName = row.merchantName || nar.counterparty;
-    const cat = row.category ? { categoryKey: row.category, confidence: row.confidence } : categorize({ merchantName, narration: row.narration, vpa: nar.vpa, amount: row.amount });
+    const cat = row.category ? { categoryKey: row.category, confidence: row.confidence } : categorizeInContext(ctx, { merchantName, narration: row.narration, vpa: nar.vpa, amount: row.amount });
     const date = parseStatementDate(row.date);
     const d = dedup(
       { amount: row.amount, date, accountId, externalRef: nar.externalRef, instrumentHint: nar.vpa, merchantName },
@@ -187,6 +188,7 @@ export async function POST(req: NextRequest) {
 
   const parsedRows: any[] = [];
   const tieRows: TieRow[] = [];
+  const catCtx = await loadCategorizationContext(userId);
 
   // existing txns for dedup (recent window)
   const existing = await prisma.transaction.findMany({
@@ -208,7 +210,7 @@ export async function POST(req: NextRequest) {
       const nar = parseNarration(ex.narration || ex.ref || "");
       const direction = ex.debit > 0 ? "DEBIT" : "CREDIT";
       const amount = ex.debit > 0 ? ex.debit : ex.credit;
-      const cat = categorize({ merchantName: nar.counterparty, narration: ex.narration, vpa: nar.vpa, amount });
+      const cat = categorizeInContext(catCtx, { merchantName: nar.counterparty, narration: ex.narration, vpa: nar.vpa, amount });
       const date = parseStatementDate(ex.dateRaw);
       const d = dedup(
         { amount, date, accountId, externalRef: nar.externalRef, instrumentHint: nar.vpa, merchantName: nar.counterparty },
@@ -241,7 +243,7 @@ export async function POST(req: NextRequest) {
   // back to the LLM adapter for messy/unfamiliar statement formats, if enabled.
   let usedLlmFallback = false;
   if ((!columnMapUsable(map) || parsedRows.length === 0) && dataRows.length > 0 && isLlmEnabled()) {
-    const llmResult = await buildRowsFromLLM(rawLinesForLLM(buf, file.name, dataRows), accountId, existingLite);
+    const llmResult = await buildRowsFromLLM(rawLinesForLLM(buf, file.name, dataRows), accountId, existingLite, catCtx);
     if (llmResult && llmResult.parsedRows.length > 0) {
       parsedRows.length = 0;
       tieRows.length = 0;

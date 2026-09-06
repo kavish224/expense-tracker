@@ -1,29 +1,8 @@
-import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { authorized } from "@/lib/cron-auth";
 import { isGmailEnabled, pollGmailForAlerts } from "@/lib/email/gmail";
 import { checkRateLimit, clientIp, rateLimitResponse } from "@/lib/rate-limit";
 import { notifyError } from "@/lib/whatsapp";
-
-function tokenMatches(provided: string, expected: string): boolean {
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
-}
-
-// Accepts either INGEST_TOKEN (manual/local testing) or CRON_SECRET (the value Vercel
-// Cron sends as `Authorization: Bearer $CRON_SECRET` when it invokes this route on a
-// schedule) — same endpoint, two legitimate callers.
-function authorized(req: NextRequest): boolean {
-  const auth = req.headers.get("authorization") || "";
-  const provided = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  if (!provided) return false;
-  const ingestToken = process.env.INGEST_TOKEN;
-  const cronSecret = process.env.CRON_SECRET;
-  if (ingestToken && tokenMatches(provided, ingestToken)) return true;
-  if (cronSecret && tokenMatches(provided, cronSecret)) return true;
-  return false;
-}
 
 async function handle(req: NextRequest) {
   if (!isGmailEnabled()) return NextResponse.json({ error: "gmail not configured" }, { status: 503 });

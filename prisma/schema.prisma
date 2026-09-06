@@ -11,6 +11,12 @@ enum AccountType {
   BANK
   CREDIT_CARD
   CASH
+  // Manually-tracked accounts (net worth, FSD 3.6) — not fed by transaction
+  // ingestion, so their balance lives on Account.currentBalance instead of
+  // being derived from a Transaction ledger.
+  INVESTMENT
+  LOAN
+  OTHER_ASSET
 }
 
 enum Direction {
@@ -85,6 +91,7 @@ model User {
   gmailEmail           String?
   gmailConnectedAt     DateTime?
   gmailNeedsReconnect  Boolean   @default(false)
+  balanceSnapshots     BalanceSnapshot[]
 }
 
 model Account {
@@ -97,6 +104,12 @@ model Account {
   identifierHint String?
   currency       String        @default("INR")
   openingBalance Decimal       @default(0) @db.Decimal(14, 2)
+  // Manually-entered balance for INVESTMENT/LOAN/OTHER_ASSET accounts (FSD 3.6)
+  // — these have no transaction ledger, so there's nothing to derive a balance
+  // from. LOAN is entered as a positive "amount owed" and negated at read time.
+  // Null for ledger accounts (BANK/CASH/CREDIT_CARD), whose balance is always
+  // computed live from openingBalance + transactions.
+  currentBalance Decimal?      @db.Decimal(14, 2)
   colorToken     String        @default("misc")
   icon           String        @default("card")
   isArchived     Boolean       @default(false)
@@ -104,8 +117,26 @@ model Account {
   transactions   Transaction[]
   transferTransactions Transaction[] @relation("TransferCounterparty")
   imports        ImportBatch[]
+  balanceSnapshots BalanceSnapshot[]
 
   @@index([userId])
+}
+
+// Point-in-time balance checkpoint (FSD 3.6) — the append-only history that
+// powers the net-worth trend chart. Never overwritten: recomputing an
+// account's current balance doesn't touch past snapshots.
+model BalanceSnapshot {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  balance   Decimal  @db.Decimal(14, 2)
+  asOf      DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([userId, asOf])
+  @@index([accountId, asOf])
 }
 
 model Category {
@@ -220,4 +251,39 @@ model GmailProcessedMessage {
   id          String   @id @default(cuid())
   messageId   String   @unique
   processedAt DateTime @default(now())
+}
+
+enum JobType {
+  TRANSFER_DETECTION_SWEEP
+  CREDIT_CARD_CYCLE_ROLLOVER
+  RECURRING_TXN_DETECTION
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  DONE
+  FAILED
+}
+
+// Audit log for the small, fixed set of periodic background tasks triggered by an
+// external scheduler (Upstash QStash, since Vercel Hobby's 2-cron slots are already
+// used by gmail/poll and notify/daily-summary) hitting /api/jobs/run. Not a general
+// work queue — each JobType's "is it time to run" decision lives in the route, this
+// table just records what happened.
+model Job {
+  id           String    @id @default(cuid())
+  type         JobType
+  userId       String?   // null = global/all-users sweep
+  payload      String?   // JSON-stringified args, e.g. { "sinceDays": 14 }
+  status       JobStatus @default(PENDING)
+  scheduledFor DateTime  @default(now())
+  attempts     Int       @default(0)
+  lastError    String?
+  runAt        DateTime?
+  finishedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([status, scheduledFor])
+  @@index([type])
 }

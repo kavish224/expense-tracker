@@ -35,6 +35,7 @@ export function QuickAdd({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [confirmingChanges, setConfirmingChanges] = useState(false);
+  const [rememberMerchant, setRememberMerchant] = useState(false);
   // React state updates from an onClick handler aren't guaranteed to have
   // committed (and re-rendered `disabled`) before a second rapid click/Enter
   // fires — a ref is checked synchronously so a double-submit can't slip through.
@@ -76,6 +77,15 @@ export function QuickAdd({
     setError("");
     try {
       const cat = categories.find((c) => c.id === catId);
+      // Best-effort — teaching a rule (and backfilling past misc/uncategorized txns
+      // from this merchant) shouldn't block or fail the transaction save itself.
+      if (rememberMerchant && !isTransfer && merchant.trim() && catId) {
+        fetch("/api/rules", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ merchantName: merchant.trim(), categoryId: catId, applyToPast: true }),
+        }).catch(() => {});
+      }
       if (isEdit && editTxn) {
         const res = await fetch(`/api/transactions/${editTxn.id}`, {
           method: "PATCH",
@@ -158,6 +168,12 @@ export function QuickAdd({
                 </Chip>
               ))}
             </Row>
+            {merchant.trim() && (
+              <label style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px 2px 0", fontSize: 12.5, color: "var(--ink-muted)", cursor: "pointer" }}>
+                <input type="checkbox" checked={rememberMerchant} onChange={(e) => setRememberMerchant(e.target.checked)} style={{ accentColor: "var(--accent)" }} />
+                Always categorize &ldquo;{merchant.trim()}&rdquo; this way
+              </label>
+            )}
           </>
         )}
 

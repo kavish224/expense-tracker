@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
-import { ClerkProvider } from "@clerk/nextjs";
+import { ClerkThemeProvider } from "@/components/ClerkThemeProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -46,9 +46,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             beforeInteractive machinery is bypassed and it renders as a plain <script>
             DOM node instead, which React 19 flags since it never executes one on the client. */}
         <Script id="theme-init" strategy="beforeInteractive">{themeInit}</Script>
-        <ClerkProvider signInUrl="/login" signUpUrl="/register" signInFallbackRedirectUrl="/" signUpFallbackRedirectUrl="/">
+        <ClerkThemeProvider>
           {children}
-        </ClerkProvider>
+        </ClerkThemeProvider>
         <Script id="sw-register" strategy="afterInteractive">
           {`if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}`}
         </Script>
