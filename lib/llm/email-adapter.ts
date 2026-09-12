@@ -66,6 +66,13 @@ const RATE_DESCRIPTOR_RE =
 const ORDER_RECEIPT_RE =
   /\b(price breakup|order journey|order (?:is )?confirmed|item\(s\) will reach you|sold by|delivered on time|shipping charges|estimated delivery|track your order|mrp)\b/i;
 
+// Same false-positive class, same duplication rationale as above: a travel/hotel/
+// table booking confirmation's "amount paid" line can ground just as convincingly
+// as a real alert (found via a real flight-booking confirmation the model accepted,
+// with the flight's future travel date mistaken for the transaction date).
+const BOOKING_CONFIRMATION_RE =
+  /\b(booking id|pnr\b|table booking confirmed|flight(?:s)?\s+helpline|itinerary|boarding pass|check-?in time|reservation confirmed)\b/i;
+
 // Returns the index of a text occurrence of `amount`, or -1 if none is found.
 function findAmountIndex(amount: number, text: string): number {
   const target2dp = amount.toFixed(2);
@@ -89,6 +96,7 @@ function findAmountIndex(amount: number, text: string): number {
 export function groundAlertOutput(output: AlertOutput, sourceText: string, sender: string): ParsedAlert | null {
   if (!output.isTransaction || output.amount == null || !output.direction) return null;
   if (ORDER_RECEIPT_RE.test(sourceText)) return null; // merchant receipt, not a bank alert
+  if (BOOKING_CONFIRMATION_RE.test(sourceText)) return null; // travel/table booking confirmation, not a bank alert
 
   const amountIdx = findAmountIndex(output.amount, sourceText);
   if (amountIdx === -1) return null; // amount must trace back to real text

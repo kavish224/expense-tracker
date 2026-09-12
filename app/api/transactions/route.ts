@@ -15,12 +15,14 @@ export async function GET(req: NextRequest) {
   const from = sp.get("from");
   const to = sp.get("to");
   const review = sp.get("review"); // "1" → only unreviewed
+  const kind = sp.get("kind"); // "EXPENSE" | "TRANSFER"
   const take = Math.min(parseInt(sp.get("take") || "100"), 500);
 
   const where: any = { userId };
   if (accountId) where.accountId = accountId;
   if (categoryId) where.categoryId = categoryId;
   if (review === "1") where.isReviewed = false;
+  if (kind === "EXPENSE" || kind === "TRANSFER") where.kind = kind;
   if (from || to) where.txnDatetime = {};
   if (from) where.txnDatetime.gte = new Date(from);
   if (to) where.txnDatetime.lte = new Date(to);

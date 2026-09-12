@@ -181,6 +181,10 @@ model Transaction {
   rawNarration   String?
   feesFlag       Boolean     @default(false)
   refundFlag     Boolean     @default(false)
+  // Set when a user explicitly dismisses a transfer-detection suggestion for
+  // this transaction ("not a transfer") — keeps it from being re-suggested on
+  // every future scan without requiring a second table just to store rejections.
+  transferIgnored Boolean    @default(false)
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
@@ -188,6 +192,7 @@ model Transaction {
   @@index([externalRef, amount, txnDatetime, accountId])
   @@index([accountId])
   @@index([transferAccountId])
+  @@index([userId, kind])
 }
 
 model Budget {

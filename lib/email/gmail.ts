@@ -2,8 +2,10 @@
 // (@googleapis/gmail + google-auth-library) rather than hand-rolled REST calls —
 // correctly handles auth, retries, and API edge cases.
 //
-// Auth: a one-time OAuth consent flow (see scripts/gmail-oauth-setup.mjs) produces a
-// refresh token, which OAuth2Client exchanges for short-lived access tokens as needed.
+// Auth: the in-app "Connect Gmail" flow (Settings → /api/gmail/oauth/start + callback)
+// produces a refresh token, stored encrypted on User.gmailRefreshToken, which
+// OAuth2Client exchanges for short-lived access tokens as needed. Same flow in local
+// dev and production — only the callback's registered redirect URI differs per origin.
 // Scope is read-only (gmail.readonly) — the poller never writes anything back to Gmail.
 //
 // Dedup: since we can't write a "processed" label back to Gmail under a read-only
@@ -11,10 +13,12 @@
 // instead.
 import { gmail_v1, gmail, auth } from "@googleapis/gmail";
 import { convert as convertHtmlToText } from "html-to-text";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { parseAlertEmail } from "@/lib/email/parse";
 import { parseAlertEmailWithLLM } from "@/lib/llm/email-adapter";
 import { createTransactionFromAlert } from "@/lib/email/ingest";
+import { decryptSecret } from "@/lib/crypto";
 
 // Client id/secret identify our app to Google and never expire — only the
 // per-user refresh token (stored on User.gmailRefreshToken, set via the
@@ -50,17 +54,54 @@ async function getClient(refreshToken: string): Promise<gmail_v1.Gmail> {
 // reprocessing the same email) is tracked in our own DB instead of a Gmail label.
 const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
 
-// Drives the in-app "Connect Gmail" button (app/api/gmail/oauth/start + callback),
-// replacing the one-off scripts/gmail-oauth-setup.mjs manual flow for end users —
-// that script still exists for local/dev bootstrapping.
-export function getGmailAuthUrl(redirectUri: string): string {
+// Drives the in-app "Connect Gmail" button (app/api/gmail/oauth/start + callback) —
+// the same code path in local dev and production, the redirect URI just needs
+// registering once per origin in the Google Cloud OAuth client.
+export function getGmailAuthUrl(redirectUri: string, state: string): string {
   const oauth2Client = oauthClient();
   return oauth2Client.generateAuthUrl({
     access_type: "offline", // required to get a refresh_token
     prompt: "consent", // forces a refresh_token even for a user who granted before
     scope: [GMAIL_SCOPE],
     redirect_uri: redirectUri,
+    state,
   });
+}
+
+// Stateless CSRF protection for the OAuth redirect (RFC 6749 §10.12): the `state`
+// param is an HMAC-signed, time-boxed token binding the callback back to the user
+// and browser session that started it — signed with a key derived from
+// CLERK_SECRET_KEY rather than requiring a session store, since Vercel Functions
+// are stateless between invocations.
+const STATE_TTL_MS = 10 * 60_000;
+
+function stateKey(): Buffer {
+  const root = process.env.CLERK_SECRET_KEY;
+  if (!root) throw new Error("CLERK_SECRET_KEY is required (used as key-derivation root)");
+  return createHmac("sha256", root).update("gmail-oauth-state-v1").digest();
+}
+
+export function signOAuthState(userId: string): string {
+  const payload = JSON.stringify({ uid: userId, ts: Date.now(), nonce: randomBytes(8).toString("hex") });
+  const payloadB64 = Buffer.from(payload).toString("base64url");
+  const sig = createHmac("sha256", stateKey()).update(payloadB64).digest("base64url");
+  return `${payloadB64}.${sig}`;
+}
+
+export function verifyOAuthState(state: string | null, expectedUserId: string): boolean {
+  if (!state) return false;
+  const [payloadB64, sig] = state.split(".");
+  if (!payloadB64 || !sig) return false;
+  const expectedSig = createHmac("sha256", stateKey()).update(payloadB64).digest("base64url");
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expectedSig);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return false;
+  try {
+    const { uid, ts } = JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8"));
+    return uid === expectedUserId && Date.now() - ts <= STATE_TTL_MS;
+  } catch {
+    return false;
+  }
 }
 
 export async function exchangeGmailCode(code: string, redirectUri: string): Promise<{ refreshToken: string; email: string | null }> {
@@ -160,20 +201,18 @@ export async function pollGmailForAlerts(opts: PollOptions = {}): Promise<PollRe
     : (await prisma.user.findFirst({ where: { gmailRefreshToken: { not: null } } })) ?? (await prisma.user.findFirst());
   if (!user) throw new Error("No user found to attribute Gmail-ingested transactions to");
 
-  // Prefer the per-user token set via the in-app Connect Gmail flow; fall back to
-  // the static GMAIL_REFRESH_TOKEN env var (the original setup path) so existing
-  // deployments keep working until a user connects through Settings.
-  const usingStoredToken = !!user.gmailRefreshToken;
-  const refreshToken = user.gmailRefreshToken || process.env.GMAIL_REFRESH_TOKEN;
-  if (!refreshToken) {
+  // The Connect Gmail flow (Settings → /api/gmail/oauth/*) is the single source of
+  // truth for this token in every environment — no env-var fallback, so local dev
+  // and prod behave identically.
+  if (!user.gmailRefreshToken) {
     throw new Error(`Gmail is not connected for ${user.email} — connect it from Settings`);
   }
 
   let client: gmail_v1.Gmail;
   try {
-    client = await getClient(refreshToken);
+    client = await getClient(decryptSecret(user.gmailRefreshToken));
   } catch (err: unknown) {
-    if (isInvalidGrantError(err) && usingStoredToken) {
+    if (isInvalidGrantError(err)) {
       await prisma.user.update({ where: { id: user.id }, data: { gmailRefreshToken: null, gmailNeedsReconnect: true } });
       throw new Error(`Gmail access for ${user.email} was revoked or expired — reconnect it from Settings`);
     }
@@ -195,7 +234,11 @@ export async function pollGmailForAlerts(opts: PollOptions = {}): Promise<PollRe
     for (const m of listData.messages || []) if (m.id) ids.push(m.id);
     pageToken = listData.nextPageToken ?? undefined;
   } while (pageToken && ids.length < maxMessages);
-  const cappedIds = ids.slice(0, maxMessages);
+  // Gmail's list pagination can return the same id across adjacent pages (e.g. if
+  // the mailbox's result ordering shifts between page fetches) — dedup before
+  // processing so a repeat id is never fully re-fetched/re-parsed/re-LLM'd, only to
+  // fail with a unique-constraint error when it tries to record itself processed twice.
+  const cappedIds = [...new Set(ids)].slice(0, maxMessages);
 
   const result: PollResult = { scanned: 0, created: 0, resolvedViaLlm: 0, skippedNoMatch: 0, skippedNoAccount: 0, skippedDuplicate: 0, skippedAlreadyProcessed: 0, errored: 0 };
   if (cappedIds.length === 0) return result;
@@ -223,12 +266,25 @@ export async function pollGmailForAlerts(opts: PollOptions = {}): Promise<PollRe
       const body = extractBody(full.payload);
 
       // List-Unsubscribe is a bulk/marketing-mail signal (RFC 2369) that legitimate
-      // transactional bank/card alerts essentially never carry — skip the LLM call
-      // entirely for these rather than relying solely on grounding to catch every
-      // false positive a promotional email could produce.
+      // transactional bank/card alerts essentially never carry — skip parsing
+      // entirely for these (both the deterministic regex path and the LLM fallback)
+      // rather than trusting either one to never misfire on a promotional email.
+      // Found via a real false positive: an HDFC marketing banner email (sent from
+      // a bulk-mail ESP domain, not the bank) got parsed as a ₹20,000 credit purely
+      // from incidental "credited"-adjacent promo copy.
+      //
+      // A tighter, header-independent link-density check was tried here too (reject
+      // when a body has several "[https://...]" link renderings) to catch the same
+      // false-positive class when List-Unsubscribe is absent — but real bank alerts'
+      // own footer disclaimers (block-card/report-fraud/set-pin links) routinely hit
+      // 3+ links themselves, so it rejected the vast majority of genuine alerts
+      // (measured: created transactions dropped from 161 to 2 in a live re-run).
+      // Reverted — the user's workflow already does a nightly manual review pass, so
+      // an occasional marketing false positive is a much cheaper mistake than
+      // silently losing most of a day's real capture.
       const isBulkMail = !!headerValue(full.payload, "List-Unsubscribe");
 
-      let alert = parseAlertEmail(body, subject, sender);
+      let alert = isBulkMail ? null : parseAlertEmail(body, subject, sender);
       if (!alert && !isBulkMail) {
         alert = await parseAlertEmailWithLLM(body, subject, sender);
         if (alert) result.resolvedViaLlm++;
@@ -243,8 +299,11 @@ export async function pollGmailForAlerts(opts: PollOptions = {}): Promise<PollRe
       }
 
       // Always record on success, even on no-match — otherwise a permanently-unparseable
-      // email would be re-fetched and re-attempted on every single poll forever.
-      await prisma.gmailProcessedMessage.create({ data: { messageId: id } });
+      // email would be re-fetched and re-attempted on every single poll forever. `upsert`
+      // rather than `create`: two overlapping poll invocations (e.g. a manual trigger
+      // racing the cron) could both reach this id past the in-memory dedup above — that's
+      // a legitimate "already recorded" outcome, not an error worth counting/logging.
+      await prisma.gmailProcessedMessage.upsert({ where: { messageId: id }, create: { messageId: id }, update: {} });
     } catch (err) {
       result.errored++;
       console.error(`Gmail poll: failed to process message ${id}:`, err);

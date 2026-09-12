@@ -3,6 +3,7 @@ import React, { createContext, useContext, useCallback, useEffect, useRef, useSt
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useClerk } from "@clerk/nextjs";
+import { toast as sonnerToast } from "sonner";
 import type { ShellAccount, ShellCategory } from "@/lib/user";
 import { useFocusTrap } from "./ui";
 import { QuickAdd, type EditableTxn } from "./QuickAdd";
@@ -23,7 +24,11 @@ export const useShell = () => useContext(Ctx)!;
 const NAV = [
   { href: "/", label: "Today", key: "H", icon: "◎" },
   { href: "/transactions", label: "Transactions", key: "T", icon: "≣" },
+  { href: "/expenses", label: "Expenses", key: "E", icon: "◆" },
+  { href: "/settlements", label: "Settlements", key: "L", icon: "⇄" },
+  { href: "/statements", label: "Statements", key: "M", icon: "▤" },
   { href: "/analytics", label: "Analytics", key: "A", icon: "▤" },
+  { href: "/investments", label: "Investments", key: "V", icon: "◈" },
   { href: "/accounts", label: "Accounts", key: "C", icon: "▦" },
   { href: "/networth", label: "Net Worth", key: "N", icon: "◈" },
   { href: "/import", label: "Import", key: "I", icon: "↥" },
@@ -43,14 +48,13 @@ export function AppShell({
   const [theme, setTheme] = useState<"dark" | "light">(() =>
     typeof window === "undefined" ? "dark" : (localStorage.getItem("theme") as "dark" | "light") || "dark"
   );
-  const [toastMsg, setToastMsg] = useState<{ msg: string; undo?: () => void } | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leader = useRef(false);
 
+  // Sonner (rendered once, globally, in app/layout.tsx) owns stacking, timing,
+  // and swipe-to-dismiss — this just adapts our existing toast(msg, undo?) call
+  // signature onto its API instead of the hand-rolled timer/fixed-div version.
   const toast = useCallback((msg: string, undo?: () => void) => {
-    setToastMsg({ msg, undo });
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToastMsg(null), 5000);
+    sonnerToast(msg, undo ? { action: { label: "Undo", onClick: undo } } : undefined);
   }, []);
 
   const toggleTheme = useCallback(() => {
@@ -131,12 +135,6 @@ export function AppShell({
       {palette && <CommandPalette accounts={accounts} onClose={() => setPalette(false)} onAdd={() => { setPalette(false); setQuickAdd(true); }} onTheme={toggleTheme} />}
       {cheat && <Cheatsheet onClose={() => setCheat(false)} />}
       <InstallPrompt />
-      {toastMsg && (
-        <div className="anim-pop" style={toastStyle} role="status" aria-live="polite">
-          <span>{toastMsg.msg}</span>
-          {toastMsg.undo && <button onClick={() => { toastMsg.undo!(); setToastMsg(null); }} style={{ background: "none", border: "none", color: "var(--accent)", fontWeight: 600, cursor: "pointer" }}>Undo</button>}
-        </div>
-      )}
 
       <style>{`
         .rail-desktop{display:none}
@@ -193,4 +191,3 @@ const miniBtn: React.CSSProperties = { textAlign: "left", background: "transpare
 const tabbar: React.CSSProperties = { position: "fixed", bottom: 0, left: 0, right: 0, height: "calc(62px + env(safe-area-inset-bottom))", borderTop: "1px solid var(--glass-border)", alignItems: "center", justifyContent: "space-around", padding: "0 12px", paddingBottom: "env(safe-area-inset-bottom)", zIndex: 40 };
 const fab: React.CSSProperties = { width: 48, height: 48, borderRadius: 16, background: "var(--accent-grad)", color: "#fff", border: "none", fontSize: 26, fontWeight: 300, marginTop: -20, boxShadow: "0 6px 20px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,.2)", cursor: "pointer" };
 const overlay: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", display: "grid", placeItems: "center", zIndex: 60 };
-const toastStyle: React.CSSProperties = { position: "fixed", bottom: "calc(78px + env(safe-area-inset-bottom))", left: "50%", transform: "translateX(-50%)", background: "var(--surface-1)", border: "1px solid var(--hairline-strong)", borderRadius: 10, padding: "10px 16px", display: "flex", gap: 16, alignItems: "center", boxShadow: "var(--shadow-e2)", zIndex: 70, fontSize: 14 };

@@ -62,7 +62,7 @@ export function SettingsClient({ gmail }: { gmail: GmailStatus }) {
             {gmail.connected && !gmail.needsReconnect ? (
               <div style={{ fontSize: 13, color: "var(--ink-muted)" }}>
                 Connected as {gmail.email}
-                {gmail.connectedAt ? ` · since ${new Date(gmail.connectedAt).toLocaleDateString()}` : ""}
+                {gmail.connectedAt ? ` · since ${new Date(gmail.connectedAt).toLocaleDateString("en-IN")}` : ""}
               </div>
             ) : gmail.needsReconnect ? (
               <div style={{ fontSize: 13, color: "var(--neg)" }}>

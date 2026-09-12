@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { kpis, dailySeries, recurring, byAccount, periodRange, type TxnLite } from "./aggregate";
+import { kpis, dailySeries, dailyCategorySeries, previousPeriodRange, recurring, byAccount, periodRange, type TxnLite } from "./aggregate";
 import { normalizeMerchant } from "@/lib/parsing/merchant";
 
 export type Period = "week" | "month" | "quarter" | "custom";
@@ -26,6 +26,22 @@ export async function computeAnalytics(userId: string, period: Period, customRan
     accountId: t.accountId,
     accountName: t.account.name,
     merchantName: t.merchantName ?? undefined,
+    categoryId: t.categoryId ?? "uncat",
+  }));
+
+  // Previous equivalent-length period, for the %-change badges on the KPI row.
+  const prevRange = previousPeriodRange(start, end);
+  const prevRows = await prisma.transaction.findMany({
+    where: { userId, txnDatetime: { gte: prevRange.start, lte: prevRange.end }, isReviewed: true, kind: "EXPENSE" },
+    include: { category: true },
+  });
+  const prevTxns: TxnLite[] = prevRows.map((t) => ({
+    amount: Number(t.amount),
+    direction: t.direction as "DEBIT" | "CREDIT",
+    txnDatetime: t.txnDatetime,
+    categoryKey: t.category?.colorToken ?? "misc",
+    accountId: t.accountId,
+    accountName: "",
   }));
 
   // category breakdown by identity (id/name/color) for display + budgets
@@ -37,7 +53,15 @@ export async function computeAnalytics(userId: string, period: Period, customRan
     cur.amount += Number(t.amount);
     catMap.set(id, cur);
   }
-  const categories = [...catMap.values()].map((c) => ({ ...c, amount: round(c.amount) })).sort((a, b) => b.amount - a.amount);
+  // budgets vs actual (computed below) — categories carry their own budget limit,
+  // when one's set, so the category list can show a progress bar inline instead of
+  // requiring a second cross-reference against the separate budgets card.
+  const budgets = await prisma.budget.findMany({ where: { userId }, include: { category: true } });
+  const budgetLimitByCategoryId = new Map(budgets.filter((b) => b.categoryId).map((b) => [b.categoryId as string, Number(b.amount)]));
+
+  const categories = [...catMap.values()]
+    .map((c) => ({ ...c, amount: round(c.amount), budgetLimit: budgetLimitByCategoryId.get(c.id) }))
+    .sort((a, b) => b.amount - a.amount);
 
   // Merchant breakdown — grouped on the normalized display name (raw bank/UPI narrations
   // like "SWIGGY*ORD8827BLR" would otherwise fragment the same real merchant into many rows).
@@ -56,7 +80,6 @@ export async function computeAnalytics(userId: string, period: Period, customRan
     .slice(0, 8);
 
   // budgets vs actual
-  const budgets = await prisma.budget.findMany({ where: { userId }, include: { category: true } });
   const totalSpent = txns.filter((t) => t.direction === "DEBIT").reduce((a, t) => a + t.amount, 0);
   const budgetRows = budgets.map((b) => {
     const actual = b.categoryId ? (catMap.get(b.categoryId)?.amount ?? 0) : totalSpent;
@@ -73,10 +96,12 @@ export async function computeAnalytics(userId: string, period: Period, customRan
     period,
     range: { start, end },
     kpis: kpis(txns, days),
+    previousKpis: kpis(prevTxns, days),
     categories,
     merchants,
     accounts: byAccount(txns),
     daily: dailySeries(txns, start, end),
+    dailyCategories: dailyCategorySeries(txns, start, end),
     recurring: recurring(txns).slice(0, 4),
     budgets: budgetRows,
   };

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
+import { Toaster } from "sonner";
 import { ClerkThemeProvider } from "@/components/ClerkThemeProvider";
 import "./globals.css";
 
@@ -49,6 +50,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ClerkThemeProvider>
           {children}
         </ClerkThemeProvider>
+        <Toaster
+          position="bottom-center"
+          theme="dark"
+          toastOptions={{
+            style: {
+              background: "var(--surface-1)",
+              border: "1px solid var(--hairline-strong)",
+              color: "var(--ink)",
+              boxShadow: "var(--shadow-e2)",
+            },
+          }}
+        />
         <Script id="sw-register" strategy="afterInteractive">
           {`if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}`}
         </Script>

@@ -1,26 +1,36 @@
 "use client";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell, LineChart, Line, CartesianGrid,
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine,
 } from "recharts";
-import { Card, Overline, Dot, Skeleton, formatINR } from "@/components/ui";
+import { Card, Overline, Dot, formatINR } from "@/components/ui";
 import { Heatmap } from "@/components/Heatmap";
 import { BudgetEditor } from "@/components/BudgetEditor";
+import { Donut, type DonutSlice } from "@/components/charts/Donut";
+import { BarList } from "@/components/charts/BarList";
+import { ChartTooltip } from "@/components/charts/ChartTooltip";
+import { AreaChartSkeleton, DonutSkeleton, BarListSkeleton } from "@/components/charts/ChartSkeleton";
+import { axisTick, gridStroke, formatCompactINR, pctDelta } from "@/lib/charts/theme";
+import { Progress } from "@/components/primitives/progress";
+import { Button } from "@/components/primitives/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/primitives/toggle-group";
 
 type Period = "week" | "month" | "quarter" | "custom";
+interface Kpis { totalSpent: number; count: number; avgPerDay: number; topCategory: { key: string; amount: number } | null }
 interface Analytics {
-  kpis: { totalSpent: number; count: number; avgPerDay: number; topCategory: { key: string; amount: number } | null };
-  categories: { id: string; name: string; colorToken: string; amount: number }[];
+  kpis: Kpis;
+  previousKpis: Kpis;
+  categories: { id: string; name: string; colorToken: string; amount: number; budgetLimit?: number }[];
   merchants: { name: string; colorToken: string; amount: number; count: number }[];
   accounts: { accountId: string; name: string; amount: number }[];
   daily: { date: string; amount: number }[];
+  dailyCategories: { date: string; categories: Record<string, number> }[];
   recurring: { merchant: string; amount: number; count: number }[];
   budgets: { id: string; name: string; colorToken: string; limit: number; actual: number }[];
 }
 
-const cssVar = (t: string) => (typeof window !== "undefined" ? getComputedStyle(document.documentElement).getPropertyValue(`--c-${t}`).trim() || "#888" : "#888");
-
 const todayStr = () => new Date().toISOString().slice(0, 10);
+const fmtDay = (d: string) => new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 
 export default function AnalyticsPage() {
   const [period, setPeriod] = useState<Period>("month");
@@ -30,6 +40,7 @@ export default function AnalyticsPage() {
   const [error, setError] = useState(false);
   const [prevPeriod, setPrevPeriod] = useState(period);
   const [editingBudgets, setEditingBudgets] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   // Clear stale data as soon as the period changes, during render (React's documented
   // pattern), so the effect below only ever does the actual fetch side-effect.
@@ -37,6 +48,7 @@ export default function AnalyticsPage() {
     setPrevPeriod(period);
     setData(null);
     setError(false);
+    setSelectedDate(null);
   }
 
   const rangeInvalid = period === "custom" && (!customFrom || !customTo || customFrom > customTo);
@@ -58,6 +70,28 @@ export default function AnalyticsPage() {
 
   useEffect(() => { const t = setTimeout(load, period === "custom" ? 400 : 0); return () => clearTimeout(t); }, [load, period]);
 
+  // Category composition for the donut: whole-period by default, or the single
+  // selected day's breakdown when a trend-chart point / heatmap cell is clicked.
+  const categoryDonutData: (DonutSlice & { budgetLimit?: number })[] = useMemo(() => {
+    if (!data) return [];
+    if (selectedDate) {
+      const day = data.dailyCategories.find((d) => d.date === selectedDate);
+      if (!day) return [];
+      return Object.entries(day.categories)
+        .map(([id, amount]) => {
+          const cat = data.categories.find((c) => c.id === id);
+          return { id, name: cat?.name ?? "Uncategorized", amount, colorToken: cat?.colorToken ?? "misc" };
+        })
+        .filter((d) => d.amount > 0)
+        .sort((a, b) => b.amount - a.amount);
+    }
+    // Budget progress only makes sense against the whole period's spend, not a
+    // single drilled-down day — omitted there rather than showing a bar against
+    // a monthly limit that one day's amount would never meaningfully fill.
+    return data.categories.map((c) => ({ id: c.id, name: c.name, amount: c.amount, colorToken: c.colorToken, budgetLimit: c.budgetLimit }));
+  }, [data, selectedDate]);
+  const categoryDonutTotal = categoryDonutData.reduce((s, d) => s + d.amount, 0);
+
   async function exportPdf() {
     if (!data) return;
     const { jsPDF } = (await import("jspdf")) as any;
@@ -78,13 +112,24 @@ export default function AnalyticsPage() {
     <div style={{ maxWidth: 980, margin: "0 auto", padding: "24px 18px 40px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
         <h1 style={{ fontSize: 22, fontWeight: 600 }}>Analytics</h1>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <div style={{ display: "inline-flex", background: "var(--surface-2)", borderRadius: 10, padding: 3 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <ToggleGroup
+            type="single"
+            value={period}
+            onValueChange={(v) => v && setPeriod(v as Period)}
+            className="inline-flex gap-0.5 rounded-[10px] bg-surface-2 p-[3px]"
+          >
             {(["week", "month", "quarter", "custom"] as Period[]).map((p) => (
-              <button key={p} onClick={() => setPeriod(p)} style={{ border: "none", background: p === period ? "var(--surface-1)" : "transparent", color: p === period ? "var(--ink)" : "var(--ink-muted)", fontWeight: p === period ? 600 : 500, fontSize: 13, padding: "6px 14px", borderRadius: 7, cursor: "pointer", boxShadow: p === period ? "var(--shadow-e1)" : "none", textTransform: "capitalize", fontFamily: "inherit" }}>{p}</button>
+              <ToggleGroupItem
+                key={p}
+                value={p}
+                className="rounded-[7px] border-none bg-transparent px-3.5 py-1.5 text-[13px] font-medium capitalize text-ink-muted data-[state=on]:bg-surface-1 data-[state=on]:font-semibold data-[state=on]:text-ink data-[state=on]:shadow-[var(--shadow-e1)]"
+              >
+                {p}
+              </ToggleGroupItem>
             ))}
-          </div>
-          <button onClick={exportPdf} style={{ fontSize: 13, color: "var(--ink-muted)", border: "1px solid var(--hairline-strong)", padding: "7px 12px", borderRadius: 9, background: "var(--surface-1)", cursor: "pointer", fontFamily: "inherit" }}>Export PDF</button>
+          </ToggleGroup>
+          <Button variant="secondary" size="sm" onClick={exportPdf}>Export PDF</Button>
         </div>
       </div>
 
@@ -101,53 +146,111 @@ export default function AnalyticsPage() {
 
       {error && <Card style={{ padding: 20, color: "var(--warn)", background: "var(--warn-tint)", border: "none" }}>Couldn&apos;t load analytics. <button onClick={load} style={{ textDecoration: "underline", background: "none", border: "none", color: "inherit", cursor: "pointer" }}>Retry</button></Card>}
 
-      {/* KPI cards (Stripe pattern) */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 16 }}>
-        <Kpi label="Total spent" value={data ? formatINR(data.kpis.totalSpent) : null} />
-        <Kpi label="Avg / day" value={data ? formatINR(data.kpis.avgPerDay) : null} />
-        <Kpi label="Transactions" value={data ? String(data.kpis.count) : null} />
-        <Kpi label="Top category" value={data ? (data.kpis.topCategory ? formatINR(data.kpis.topCategory.amount) : "—") : null} sub={data?.kpis.topCategory?.key} />
-      </div>
+      {/* Hero: one number that answers "how much", plus period-over-period context */}
+      <Card lift style={{ padding: 20, marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 20 }}>
+          <div>
+            <Overline>Total spent</Overline>
+            {!data ? (
+              <div className="skeleton" style={{ width: 160, height: 36, marginTop: 6, borderRadius: 8 }} />
+            ) : (
+              <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 2 }}>
+                <div className="num" style={{ fontSize: 34, fontWeight: 700, letterSpacing: "-0.02em" }}>{formatINR(data.kpis.totalSpent)}</div>
+                <Delta pct={pctDelta(data.kpis.totalSpent, data.previousKpis.totalSpent)} tone="invert" />
+              </div>
+            )}
+            <div style={{ fontSize: 12, color: "var(--ink-subtle)", marginTop: 2 }}>vs previous {period === "custom" ? "period" : period}</div>
+          </div>
+          <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+            <KpiChip label="Avg / day" value={data ? formatINR(data.kpis.avgPerDay) : null} pct={data ? pctDelta(data.kpis.avgPerDay, data.previousKpis.avgPerDay) : undefined} tone="invert" />
+            <KpiChip label="Transactions" value={data ? String(data.kpis.count) : null} pct={data ? pctDelta(data.kpis.count, data.previousKpis.count) : undefined} />
+            <KpiChip label="Top category" value={data ? (data.kpis.topCategory ? formatINR(data.kpis.topCategory.amount) : "—") : null} sub={data?.kpis.topCategory?.key} />
+          </div>
+        </div>
+      </Card>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 16 }}>
-        {/* Category bars */}
+        {/* Category composition */}
         <Card style={{ padding: 18 }}>
-          <Overline style={{ marginBottom: 14 }}>By category</Overline>
-          {!data ? <Skeleton h={180} /> : data.categories.length === 0 ? <Empty /> : (
-            <ResponsiveContainer width="100%" height={Math.max(160, data.categories.length * 34)}>
-              <BarChart layout="vertical" data={data.categories} margin={{ left: 8, right: 16 }}>
-                <XAxis type="number" hide />
-                <YAxis type="category" dataKey="name" width={92} tick={{ fontSize: 12, fill: "var(--ink-muted)" }} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{ fill: "var(--surface-2)" }} contentStyle={tip} formatter={(v: any) => formatINR(Number(v))} />
-                <Bar dataKey="amount" radius={[0, 5, 5, 0]} barSize={16}>
-                  {data.categories.map((c) => <Cell key={c.id} fill={cssVar(c.colorToken)} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <Overline style={{ marginBottom: 0 }}>By category</Overline>
+            {selectedDate && (
+              <Button variant="secondary" size="sm" className="h-auto rounded-full px-2.5 py-1 text-[11.5px]" onClick={() => setSelectedDate(null)}>{fmtDay(selectedDate)} ✕</Button>
+            )}
+          </div>
+          {!data ? <DonutSkeleton /> : categoryDonutData.length === 0 ? <Empty /> : (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+              <Donut data={categoryDonutData} centerLabel={selectedDate ? fmtDay(selectedDate) : "Total"} centerValue={formatINR(categoryDonutTotal)} />
+              <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
+                {categoryDonutData.map((c) => {
+                  const pct = c.budgetLimit ? Math.min(100, (c.amount / c.budgetLimit) * 100) : null;
+                  const over = c.budgetLimit != null && c.amount > c.budgetLimit;
+                  const tone = over ? "neg" : pct !== null && pct >= 80 ? "warn" : "pos";
+                  return (
+                    <div key={c.id}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13.5 }}>
+                        <Dot token={c.colorToken} size={8} />
+                        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
+                        <span className="num" style={{ fontWeight: 600 }}>
+                          {formatINR(c.amount)}{c.budgetLimit != null && <span style={{ color: "var(--ink-subtle)", fontWeight: 400 }}> / {formatINR(c.budgetLimit)}</span>}
+                        </span>
+                      </div>
+                      {pct !== null && <Progress value={pct} tone={tone} className="mt-[5px] ml-[17px] w-auto" />}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           )}
         </Card>
 
-        {/* Trend line */}
+        {/* Trend — clickable to cross-filter category composition to a single day */}
         <Card style={{ padding: 18 }}>
-          <Overline style={{ marginBottom: 14 }}>Daily trend</Overline>
-          {!data ? <Skeleton h={180} /> : (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <Overline style={{ marginBottom: 0 }}>Daily trend</Overline>
+            {selectedDate && (
+              <Button variant="secondary" size="sm" className="h-auto rounded-full px-2.5 py-1 text-[11.5px]" onClick={() => setSelectedDate(null)}>{fmtDay(selectedDate)} ✕</Button>
+            )}
+          </div>
+          {!data ? <AreaChartSkeleton /> : (
             <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={data.daily} margin={{ left: 4, right: 8, top: 6 }}>
-                <CartesianGrid stroke="var(--hairline)" vertical={false} />
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "var(--ink-subtle)" }} tickFormatter={(d) => new Date(d).getDate().toString()} axisLine={false} tickLine={false} minTickGap={16} />
-                <YAxis tick={{ fontSize: 10, fill: "var(--ink-subtle)" }} axisLine={false} tickLine={false} width={44} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                <Tooltip contentStyle={tip} formatter={(v: any) => formatINR(Number(v))} labelFormatter={(l: any) => new Date(l).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} />
-                <Line type="monotone" dataKey="amount" stroke="var(--accent)" strokeWidth={2} dot={false} />
-              </LineChart>
+              <AreaChart
+                data={data.daily}
+                margin={{ left: 4, right: 8, top: 6 }}
+                onClick={(p: any) => {
+                  const d = p?.activeLabel as string | undefined;
+                  if (!d) return;
+                  setSelectedDate((prev) => (prev === d ? null : d));
+                }}
+                style={{ cursor: "pointer" }}
+              >
+                <defs>
+                  <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="var(--accent)" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke={gridStroke} vertical={false} />
+                <XAxis dataKey="date" tick={axisTick} tickFormatter={(d) => new Date(d).getDate().toString()} axisLine={false} tickLine={false} minTickGap={16} />
+                <YAxis tick={axisTick} axisLine={false} tickLine={false} width={48} tickFormatter={formatCompactINR} />
+                <ReferenceLine y={data.kpis.avgPerDay} stroke="var(--ink-subtle)" strokeDasharray="4 4" strokeOpacity={0.6} />
+                {selectedDate && <ReferenceLine x={selectedDate} stroke="var(--ink)" strokeDasharray="3 3" />}
+                <Tooltip
+                  content={(p: any) => (
+                    <ChartTooltip {...p} formatter={(v: number) => formatINR(v)} labelFormatter={(l) => fmtDay(String(l))} />
+                  )}
+                />
+                <Area type="monotone" dataKey="amount" name="Spent" stroke="var(--accent)" strokeWidth={2.5} fill="url(#trendGrad)" dot={false} activeDot={{ r: 4 }} />
+              </AreaChart>
             </ResponsiveContainer>
           )}
         </Card>
       </div>
 
-      {/* Calendar heatmap (Zerodha Console pattern) */}
+      {/* Calendar heatmap — clicking a day drives the same cross-filter as the trend chart */}
       <Card style={{ padding: 18, marginTop: 16 }}>
         <Overline style={{ marginBottom: 14 }}>Spending calendar</Overline>
-        {!data ? <Skeleton h={120} /> : <Heatmap data={data.daily} />}
+        {!data ? <AreaChartSkeleton height={120} /> : <Heatmap data={data.daily} selectedDate={selectedDate} onSelect={setSelectedDate} />}
       </Card>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 16, marginTop: 16 }}>
@@ -155,26 +258,24 @@ export default function AnalyticsPage() {
         <Card style={{ padding: 18 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <Overline style={{ marginBottom: 0 }}>Budgets vs actual</Overline>
-            <button onClick={() => setEditingBudgets(true)} style={editBtn}>Edit</button>
+            <Button variant="ghost" size="sm" className="h-auto rounded-full bg-accent-tint px-3 py-1 text-[12px] text-accent" onClick={() => setEditingBudgets(true)}>Edit</Button>
           </div>
-          {!data ? <Skeleton h={160} /> : data.budgets.length === 0 ? (
+          {!data ? <BarListSkeleton /> : data.budgets.length === 0 ? (
             <div style={{ padding: "10px 0" }}>
               <div style={{ fontSize: 13, color: "var(--ink-subtle)", marginBottom: 10 }}>No budgets set yet.</div>
-              <button onClick={() => setEditingBudgets(true)} style={{ ...editBtn, padding: "8px 14px" }}>Set a budget</button>
+              <Button variant="ghost" size="sm" className="h-auto rounded-full bg-accent-tint px-3.5 py-2 text-[12px] text-accent" onClick={() => setEditingBudgets(true)}>Set a budget</Button>
             </div>
           ) : data.budgets.map((b) => {
             const pct = Math.min(100, (b.actual / b.limit) * 100);
             const over = b.actual > b.limit;
+            const tone = over ? "neg" : pct >= 80 ? "warn" : "pos";
             return (
               <div key={b.id} style={{ padding: "10px 0", borderBottom: "1px solid var(--hairline)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 7 }}>
                   <span style={{ fontSize: 13.5, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 6 }}>{b.name !== "Overall" && <Dot token={b.colorToken} size={8} />}{b.name}</span>
                   <span className="num" style={{ fontSize: 12.5, color: "var(--ink-muted)" }}>{formatINR(b.actual)} / {formatINR(b.limit)}</span>
                 </div>
-                <div style={{ height: 7, background: "var(--surface-2)", borderRadius: 999, overflow: "hidden", display: "flex" }}>
-                  <span style={{ width: `${pct}%`, background: b.name === "Overall" ? "var(--accent)" : cssVar(b.colorToken), borderRadius: 999 }} />
-                  {over && <span style={{ width: "6%", background: "var(--ink-subtle)", opacity: 0.5 }} />}
-                </div>
+                <Progress value={pct} tone={tone} className="h-[7px]" />
                 <div className="num" style={{ fontSize: 11.5, color: "var(--ink-subtle)", marginTop: 5 }}>{over ? `${formatINR(b.actual - b.limit)} over — review` : `${formatINR(b.limit - b.actual)} left`}</div>
               </div>
             );
@@ -185,38 +286,22 @@ export default function AnalyticsPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <Card style={{ padding: 18 }}>
             <Overline style={{ marginBottom: 14 }}>Top merchants</Overline>
-            {!data ? <Skeleton h={140} /> : data.merchants.length === 0 ? (
+            {!data ? <BarListSkeleton /> : data.merchants.length === 0 ? (
               <div style={{ fontSize: 13, color: "var(--ink-subtle)", padding: "6px 0" }}>No spending this period yet.</div>
             ) : (
-              <>
-                {data.merchants.map((m, i) => {
-                  const pct = data.merchants[0].amount > 0 ? (m.amount / data.merchants[0].amount) * 100 : 0;
-                  return (
-                    <div key={m.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: i < data.merchants.length - 1 ? "1px solid var(--hairline)" : "none" }}>
-                      <Dot token={m.colorToken} size={8} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, fontWeight: 600, gap: 8 }}>
-                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</span>
-                          <span className="num" style={{ flex: "none" }}>{formatINR(m.amount)}</span>
-                        </div>
-                        <div style={{ height: 4, background: "var(--surface-2)", borderRadius: 999, overflow: "hidden", marginTop: 5 }}>
-                          <span style={{ display: "block", width: `${pct}%`, height: "100%", background: cssVar(m.colorToken), borderRadius: 999 }} />
-                        </div>
-                      </div>
-                      <span style={{ fontSize: 11, color: "var(--ink-subtle)", flex: "none" }}>×{m.count}</span>
-                    </div>
-                  );
-                })}
-              </>
+              <BarList
+                data={data.merchants.map((m) => ({ key: m.name, name: m.name, value: m.amount, colorToken: m.colorToken, sub: `×${m.count}` }))}
+                valueFormatter={formatINR}
+              />
             )}
           </Card>
           <Card style={{ padding: 18 }}>
             <Overline style={{ marginBottom: 14 }}>By account</Overline>
-            {!data ? <Skeleton h={100} /> : data.accounts.map((a) => (
-              <div key={a.accountId} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--hairline)", fontSize: 13.5 }}>
-                <span>{a.name}</span><span className="num" style={{ fontWeight: 600 }}>{formatINR(a.amount)}</span>
-              </div>
-            ))}
+            {!data ? (
+              <BarListSkeleton rows={3} />
+            ) : (
+              <BarList data={data.accounts.map((a) => ({ key: a.accountId, name: a.name, value: a.amount }))} valueFormatter={formatINR} />
+            )}
           </Card>
           {data && data.recurring.length > 0 && (
             <Card style={{ padding: 18 }}>
@@ -236,17 +321,33 @@ export default function AnalyticsPage() {
   );
 }
 
-function Kpi({ label, value, sub }: { label: string; value: string | null; sub?: string }) {
+/** Percent-change badge. `tone` decides whether the color judges the change:
+ * "invert" = lower is better (spend, avg/day), "neutral" = no judgement, just
+ * report the direction (transaction count — more isn't inherently bad). */
+function Delta({ pct, tone = "neutral" }: { pct: number | null | undefined; tone?: "invert" | "neutral" }) {
+  if (pct === null || pct === undefined) return null;
+  const up = pct > 0;
+  const good = tone === "neutral" || pct === 0 ? null : !up;
+  const color = good === null ? "var(--ink-subtle)" : good ? "var(--pos)" : "var(--neg)";
+  const arrow = pct === 0 ? "" : up ? "▲" : "▼";
+  return <span className="num" style={{ fontSize: 13, fontWeight: 600, color }}>{arrow} {Math.abs(pct).toFixed(0)}%</span>;
+}
+
+function KpiChip({ label, value, sub, pct, tone }: { label: string; value: string | null; sub?: string; pct?: number | null; tone?: "invert" | "neutral" }) {
   return (
-    <Card lift style={{ padding: 16 }}>
-      <Overline style={{ fontSize: 10 }}>{label}</Overline>
-      {value === null ? <Skeleton h={26} style={{ marginTop: 6 }} /> : <div className="num" style={{ fontSize: 24, fontWeight: 600, letterSpacing: "-0.01em", marginTop: 4 }}>{value}</div>}
+    <div style={{ minWidth: 90 }}>
+      <Overline style={{ fontSize: 10, marginBottom: 4 }}>{label}</Overline>
+      {value === null ? <div className="skeleton" style={{ width: 64, height: 20, borderRadius: 6 }} /> : (
+        <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
+          <span className="num" style={{ fontSize: 18, fontWeight: 700 }}>{value}</span>
+          <Delta pct={pct} tone={tone} />
+        </div>
+      )}
       {sub && <div style={{ fontSize: 11, color: "var(--ink-subtle)", marginTop: 2, textTransform: "capitalize" }}>{sub}</div>}
-    </Card>
+    </div>
   );
 }
+
 function Empty() {
   return <div style={{ height: 160, display: "grid", placeItems: "center", color: "var(--ink-subtle)", fontSize: 13, textAlign: "center" }}>No spending this period yet.</div>;
 }
-const tip: React.CSSProperties = { background: "var(--surface-1)", border: "1px solid var(--hairline-strong)", borderRadius: 8, fontSize: 12, color: "var(--ink)" } as any;
-const editBtn: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "var(--accent)", background: "var(--accent-tint)", border: "none", borderRadius: 999, padding: "5px 12px", cursor: "pointer", fontFamily: "inherit" };

@@ -88,6 +88,15 @@ const RE_RATE_DESCRIPTOR = /\b(?:per|every)\s+(?:rs\.?|inr|₹)?\s*[\d,]+(?:\.\d
 const RE_ORDER_RECEIPT =
   /\b(price breakup|order journey|order (?:is )?confirmed|item\(s\) will reach you|sold by|delivered on time|shipping charges|estimated delivery|track your order|mrp)\b/i;
 
+// Travel/hotel/table booking confirmations — a "payment" line inside these confirms
+// a reservation, not a bank/wallet transaction, but can still satisfy the amount+verb
+// proximity check (e.g. a flight-booking confirmation stating "amount paid ₹X").
+// Found via two real false positives: a flight-booking confirmation (with a future
+// travel date misread as the transaction date) and a restaurant table-booking
+// confirmation, both from live Gmail polling.
+const RE_BOOKING_CONFIRMATION =
+  /\b(booking id|pnr\b|table booking confirmed|flight(?:s)?\s+helpline|itinerary|boarding pass|check-?in time|reservation confirmed)\b/i;
+
 // Credit card bill payment alerts (bank-side "we received your payment" or
 // "auto-debit towards your card" messages) — these move money from a bank
 // account to pay down a credit card, not a new expense. Tuned against the
@@ -119,6 +128,7 @@ function extractMerchant(text: string, narrationCounterparty?: string): string |
 export function parseAlertEmail(body: string, subject = "", sender = ""): ParsedAlert | null {
   const text = `${subject}\n${body}`.replace(/\s+/g, " ").trim();
   if (RE_ORDER_RECEIPT.test(text)) return null; // merchant receipt, not a bank alert
+  if (RE_BOOKING_CONFIRMATION.test(text)) return null; // travel/table booking confirmation, not a bank alert
 
   let amount: number | undefined;
   let direction: "DEBIT" | "CREDIT" | undefined;

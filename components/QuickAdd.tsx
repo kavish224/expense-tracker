@@ -1,7 +1,13 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { ShellAccount, ShellCategory } from "@/lib/user";
-import { Dot, formatINR, useFocusTrap } from "./ui";
+import { formatINR } from "./ui";
+import { useMediaQuery } from "@/lib/useMediaQuery";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./primitives/dialog";
+import { Drawer, DrawerContent, DrawerTitle } from "./primitives/drawer";
+import { ToggleGroup, ToggleGroupItem } from "./primitives/toggle-group";
+import { Button } from "./primitives/button";
+import { Input, Label } from "./primitives/input";
 
 const RECENTS = [
   { label: "Swiggy", amount: 0, cat: "food" },
@@ -23,6 +29,7 @@ export interface EditableTxn {
 export function QuickAdd({
   accounts, categories, editTxn, onClose, onSaved,
 }: { accounts: ShellAccount[]; categories: ShellCategory[]; editTxn?: EditableTxn; onClose: () => void; onSaved: (msg: string) => void }) {
+  const isDesktop = useMediaQuery("(min-width: 820px)");
   const isEdit = !!editTxn;
   const [amount, setAmount] = useState(editTxn ? String(editTxn.amount) : "");
   const defaultCat = categories.find((c) => c.colorToken === "food") ?? categories[0];
@@ -40,23 +47,20 @@ export function QuickAdd({
   // committed (and re-rendered `disabled`) before a second rapid click/Enter
   // fires — a ref is checked synchronously so a double-submit can't slip through.
   const savingRef = useRef(false);
-  const containerRef = useRef<HTMLFormElement>(null);
   const desktopAmountRef = useRef<HTMLInputElement>(null);
-  useFocusTrap(containerRef, true);
 
-  // Desktop/tablet (>=820px, matching AppShell's rail breakpoint) has a real keyboard
-  // and pointer available — jump straight into the amount field instead of making
-  // people tap out a number on an on-screen keypad built for thumbs.
+  // Desktop has a real keyboard — jump straight into the amount field instead
+  // of making people tap a number out on an on-screen keypad built for thumbs.
   useEffect(() => {
-    if (window.matchMedia("(min-width: 820px)").matches) desktopAmountRef.current?.focus();
-  }, []);
+    if (isDesktop) desktopAmountRef.current?.focus();
+  }, [isDesktop]);
 
   const topCats = useMemo(() => categories.filter((c) => c.colorToken !== "income").slice(0, 6), [categories]);
 
   function press(k: string) {
     setConfirmingChanges(false);
     if (k === "⌫") setAmount((a) => a.slice(0, -1));
-    else if (k === "." ) setAmount((a) => (a.includes(".") ? a : a + "."));
+    else if (k === ".") setAmount((a) => (a.includes(".") ? a : a + "."));
     else setAmount((a) => (a === "0" ? k : a + k));
   }
 
@@ -118,154 +122,218 @@ export function QuickAdd({
     }
   }
 
-  return (
-    <div onClick={onClose} className="qa-overlay anim-fade" style={overlay}>
-      <form
-        ref={containerRef}
-        role="dialog" aria-modal="true" aria-label={isEdit ? "Edit expense" : "Add expense"}
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={(e) => { e.preventDefault(); save(); }}
-        className="qa-sheet anim-sheet" style={sheet}
-      >
-        <div className="qa-grabber" style={{ width: 36, height: 4, borderRadius: 2, background: "var(--hairline-strong)", margin: "0 auto 16px" }} />
-        {isEdit && <div style={{ textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--ink-muted)", marginBottom: 6 }}>Edit expense</div>}
-        <div className="num qa-amt-display" style={{ textAlign: "center", fontSize: 46, fontWeight: 600, letterSpacing: "-0.02em", minHeight: 54 }}>
-          <span style={{ color: "var(--ink-subtle)", fontSize: 28 }}>₹</span>{amount || "0"}
-        </div>
-        <div className="qa-amt-input" style={{ display: "flex", alignItems: "baseline", justifyContent: "center" }}>
-          <span style={{ color: "var(--ink-subtle)", fontSize: 28 }}>₹</span>
-          <input
-            ref={desktopAmountRef}
-            className="num"
-            value={amount}
-            onChange={(e) => typeAmount(e.target.value)}
-            inputMode="decimal"
-            placeholder="0"
-            aria-label="Amount"
-            style={{ width: 200, textAlign: "center", fontSize: 46, fontWeight: 600, letterSpacing: "-0.02em", background: "transparent", border: "none", outline: "none", color: "var(--ink)", fontFamily: "inherit" }}
-          />
-        </div>
-
-        <input value={merchant} onChange={(e) => { setConfirmingChanges(false); setMerchant(e.target.value); }} placeholder="Add a note or merchant (optional)"
-          style={{ width: "100%", textAlign: "center", background: "transparent", border: "none", color: "var(--ink-muted)", fontSize: 14, margin: "8px 0 4px", outline: "none", fontFamily: "inherit" }} />
-
-        <Label>Recents</Label>
-        <Row>
-          {RECENTS.map((r) => (
-            <Chip key={r.label} onClick={() => { setConfirmingChanges(false); if (r.amount) setAmount(String(r.amount)); const c = categories.find((x) => x.colorToken === (r.cat === "shopping" ? "shop" : r.cat)); if (c) setCatId(c.id); setMerchant(r.label.replace(/ ₹.*/, "")); }}>
-              {r.label}
-            </Chip>
-          ))}
-        </Row>
-
-        {!isTransfer && (
-          <>
-            <Label>Category</Label>
-            <Row>
-              {topCats.map((c) => (
-                <Chip key={c.id} selected={c.id === catId} onClick={() => { setConfirmingChanges(false); setCatId(c.id); }}>
-                  <Dot token={c.colorToken} size={8} /> {c.name.split(" ")[0]}
-                </Chip>
-              ))}
-            </Row>
-            {merchant.trim() && (
-              <label style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px 2px 0", fontSize: 12.5, color: "var(--ink-muted)", cursor: "pointer" }}>
-                <input type="checkbox" checked={rememberMerchant} onChange={(e) => setRememberMerchant(e.target.checked)} style={{ accentColor: "var(--accent)" }} />
-                Always categorize &ldquo;{merchant.trim()}&rdquo; this way
-              </label>
-            )}
-          </>
-        )}
-
-        <Label>Account</Label>
-        <Row>
-          {accounts.map((a) => (
-            <Chip key={a.id} selected={a.id === accId} onClick={() => { setConfirmingChanges(false); setAccId(a.id); }}>{a.name}</Chip>
-          ))}
-        </Row>
-
-        {isEdit && (
-          <>
-            <Label>Type</Label>
-            <Row>
-              <Chip selected={!isTransfer} onClick={() => { setConfirmingChanges(false); setIsTransfer(false); }}>Expense</Chip>
-              <Chip selected={isTransfer} onClick={() => { setConfirmingChanges(false); setIsTransfer(true); }}>Payment to another account</Chip>
-            </Row>
-          </>
-        )}
-
-        {isTransfer && (
-          <>
-            <Label>Paying towards</Label>
-            <Row>
-              {accounts.filter((a) => a.id !== accId).map((a) => (
-                <Chip key={a.id} selected={a.id === transferAccId} onClick={() => { setConfirmingChanges(false); setTransferAccId(a.id); }}>{a.name}</Chip>
-              ))}
-            </Row>
-          </>
-        )}
-
-        <div className="qa-numpad" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6, margin: "12px 0" }}>
-          {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫"].map((k) => (
-            <button key={k} type="button" onClick={() => press(k)} style={key}>{k}</button>
-          ))}
-        </div>
-
-        {error && <div role="alert" style={{ color: "var(--neg)", fontSize: 13, textAlign: "center", margin: "0 0 8px" }}>{error}</div>}
-        {confirmingChanges ? (
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" onClick={() => setConfirmingChanges(false)} disabled={saving} style={{ flex: 1, background: "var(--surface-2)", color: "var(--ink)", border: "1px solid var(--hairline-strong)", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-              Cancel
-            </button>
-            <button type="submit" disabled={saving} className="btn-x btn-p" style={{ flex: 2, background: "var(--accent-grad)", color: "#fff", border: "none", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, cursor: "pointer", boxShadow: "0 4px 16px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,.16)" }}>
-              {saving ? "Saving…" : "Confirm changes"}
-            </button>
-          </div>
-        ) : (
-          <button type="submit" disabled={saving || !amount} className={amount ? "btn-x btn-p" : undefined} style={{ width: "100%", background: "var(--accent-grad)", color: "#fff", border: "none", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, cursor: "pointer", opacity: !amount ? 0.5 : 1, boxShadow: amount ? "0 4px 16px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,.16)" : "none" }}>
-            {saving ? "Saving…" : isEdit ? "Save changes" : `Save${amount ? " · " + formatINR(parseFloat(amount) || 0) : ""}`}
+  const recentsPicker = (
+    <div>
+      <Label>Recents</Label>
+      <div className="flex flex-wrap gap-2">
+        {RECENTS.map((r) => (
+          <button
+            key={r.label}
+            type="button"
+            onClick={() => { setConfirmingChanges(false); if (r.amount) setAmount(String(r.amount)); const c = categories.find((x) => x.colorToken === (r.cat === "shopping" ? "shop" : r.cat)); if (c) setCatId(c.id); setMerchant(r.label.replace(/ ₹.*/, "")); }}
+            className="cursor-pointer whitespace-nowrap rounded-full border border-hairline bg-surface-1 px-3 py-2 text-[12.5px] font-semibold text-ink"
+          >
+            {r.label}
           </button>
-        )}
-      </form>
-      <style>{responsiveCss}</style>
+        ))}
+      </div>
     </div>
   );
-}
 
-function Label({ children }: { children: React.ReactNode }) {
-  return <div className="overline" style={{ margin: "12px 2px 8px", fontSize: 11 }}>{children}</div>;
-}
-function Row({ children }: { children: React.ReactNode }) {
-  return <div className="qa-row" style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2 }}>{children}</div>;
-}
-function Chip({ children, selected, onClick }: { children: React.ReactNode; selected?: boolean; onClick?: () => void }) {
+  const categoryPicker = !isTransfer && (
+    <div>
+      <Label>Category</Label>
+      <ToggleGroup
+        type="single"
+        value={catId}
+        onValueChange={(v) => { if (v) { setConfirmingChanges(false); setCatId(v); } }}
+        className="flex flex-wrap gap-2"
+      >
+        {topCats.map((c) => (
+          <ToggleGroupItem key={c.id} value={c.id}>
+            <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: `var(--c-${c.colorToken})` }} />
+            {c.name.split(" ")[0]}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+      {merchant.trim() && (
+        <label className="mt-2.5 flex cursor-pointer items-center gap-2 text-[12.5px] text-ink-muted">
+          <input type="checkbox" checked={rememberMerchant} onChange={(e) => setRememberMerchant(e.target.checked)} className="accent-accent" />
+          Always categorize &ldquo;{merchant.trim()}&rdquo; this way
+        </label>
+      )}
+    </div>
+  );
+
+  const accountPicker = (
+    <div>
+      <Label>Account</Label>
+      <ToggleGroup
+        type="single"
+        value={accId}
+        onValueChange={(v) => { if (v) { setConfirmingChanges(false); setAccId(v); } }}
+        className="flex flex-wrap gap-2"
+      >
+        {accounts.map((a) => (
+          <ToggleGroupItem key={a.id} value={a.id}>{a.name}</ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+    </div>
+  );
+
+  const typeAndTransferPicker = (
+    <>
+      {isEdit && (
+        <div>
+          <Label>Type</Label>
+          <ToggleGroup
+            type="single"
+            value={isTransfer ? "transfer" : "expense"}
+            onValueChange={(v) => { if (v) { setConfirmingChanges(false); setIsTransfer(v === "transfer"); } }}
+            className="flex flex-wrap gap-2"
+          >
+            <ToggleGroupItem value="expense">Expense</ToggleGroupItem>
+            <ToggleGroupItem value="transfer">Payment to another account</ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+      )}
+      {isTransfer && (
+        <div>
+          <Label>Paying towards</Label>
+          <ToggleGroup
+            type="single"
+            value={transferAccId}
+            onValueChange={(v) => { if (v) { setConfirmingChanges(false); setTransferAccId(v); } }}
+            className="flex flex-wrap gap-2"
+          >
+            {accounts.filter((a) => a.id !== accId).map((a) => (
+              <ToggleGroupItem key={a.id} value={a.id}>{a.name}</ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </div>
+      )}
+    </>
+  );
+
+  const merchantField = (
+    <div>
+      <Label>Merchant / note</Label>
+      <Input value={merchant} onChange={(e) => { setConfirmingChanges(false); setMerchant(e.target.value); }} placeholder="Optional" />
+    </div>
+  );
+
+  const errorBanner = error && <div role="alert" className="text-[13px] text-neg">{error}</div>;
+
+  const saveLabel = saving
+    ? "Saving…"
+    : confirmingChanges
+      ? "Confirm changes"
+      : isEdit
+        ? "Save changes"
+        : `Save${amount ? " · " + formatINR(parseFloat(amount) || 0) : ""}`;
+
+  // ---------------------------------------------------------------- Desktop
+  if (isDesktop) {
+    return (
+      <Dialog open onOpenChange={(open) => !open && onClose()}>
+        <DialogContent aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>{isEdit ? "Edit expense" : "Add expense"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => { e.preventDefault(); save(); }} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Amount</Label>
+                <div className="flex h-9 items-center gap-1 rounded-[10px] border border-hairline-strong bg-surface-2 px-3">
+                  <span className="text-[15px] text-ink-subtle">₹</span>
+                  <input
+                    ref={desktopAmountRef}
+                    className="num min-w-0 flex-1 bg-transparent text-[15px] font-semibold text-ink outline-none"
+                    value={amount}
+                    onChange={(e) => typeAmount(e.target.value)}
+                    inputMode="decimal"
+                    placeholder="0"
+                    aria-label="Amount"
+                  />
+                </div>
+              </div>
+              {merchantField}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {accountPicker}
+              {categoryPicker}
+            </div>
+            {typeAndTransferPicker}
+            {recentsPicker}
+            {errorBanner}
+            <DialogFooter>
+              <Button type="button" variant="secondary" onClick={confirmingChanges ? () => setConfirmingChanges(false) : onClose} disabled={saving}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving || !amount}>{saveLabel}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // ------------------------------------------------------------------ Mobile
   return (
-    <button type="button" onClick={onClick} style={{
-      display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", fontFamily: "inherit",
-      fontSize: 12.5, fontWeight: 600, padding: "8px 12px", borderRadius: 999, cursor: "pointer",
-      border: `1px solid ${selected ? "var(--accent)" : "var(--hairline)"}`,
-      background: selected ? "var(--accent-tint)" : "var(--surface-1)",
-      color: selected ? "var(--accent)" : "var(--ink)",
-    }}>{children}</button>
+    <Drawer open onOpenChange={(open) => !open && onClose()}>
+      <DrawerContent aria-describedby={undefined}>
+        <DrawerTitle className="sr-only">{isEdit ? "Edit expense" : "Add expense"}</DrawerTitle>
+        <form onSubmit={(e) => { e.preventDefault(); save(); }} className="flex-1 overflow-y-auto px-4 pb-[calc(20px+env(safe-area-inset-bottom))] pt-2">
+          {isEdit && <div className="mb-1.5 text-center text-[13px] font-semibold text-ink-muted">Edit expense</div>}
+          <div className="num text-center text-[46px] font-semibold leading-tight tracking-tight" style={{ minHeight: 54 }}>
+            <span className="text-[28px] text-ink-subtle">₹</span>{amount || "0"}
+          </div>
+
+          <input
+            value={merchant}
+            onChange={(e) => { setConfirmingChanges(false); setMerchant(e.target.value); }}
+            placeholder="Add a note or merchant (optional)"
+            className="my-2 w-full bg-transparent text-center text-[14px] text-ink-muted outline-none"
+          />
+
+          <div className="space-y-4">
+            {recentsPicker}
+            {categoryPicker}
+            {accountPicker}
+            {typeAndTransferPicker}
+          </div>
+
+          <div className="my-3 grid grid-cols-3 gap-1.5">
+            {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫"].map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => press(k)}
+                className="cursor-pointer rounded-[10px] bg-surface-2 py-3 text-center text-[20px] font-medium text-ink"
+              >
+                {k}
+              </button>
+            ))}
+          </div>
+
+          {error && <div role="alert" className="mb-2 text-center text-[13px] text-neg">{error}</div>}
+
+          {confirmingChanges ? (
+            <div className="flex gap-2">
+              <Button type="button" variant="secondary" onClick={() => setConfirmingChanges(false)} disabled={saving} className="h-[52px] flex-1 rounded-[13px] text-[15px]">
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving} className="h-[52px] flex-[2] rounded-[13px] text-[15px]">
+                {saving ? "Saving…" : "Confirm changes"}
+              </Button>
+            </div>
+          ) : (
+            <Button type="submit" disabled={saving || !amount} className="h-[52px] w-full rounded-[13px] text-[15px]">
+              {saveLabel}
+            </Button>
+          )}
+        </form>
+      </DrawerContent>
+    </Drawer>
   );
 }
-const overlay: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 80, display: "flex", alignItems: "flex-end", justifyContent: "center" };
-const sheet: React.CSSProperties = { width: "100%", maxWidth: 440, background: "var(--surface-1)", borderRadius: "20px 20px 0 0", border: "1px solid var(--hairline)", padding: "10px 16px calc(20px + env(safe-area-inset-bottom))", maxHeight: "92dvh", overflowY: "auto" };
-const key: React.CSSProperties = { padding: "12px 0", textAlign: "center", fontSize: 20, fontWeight: 500, borderRadius: 10, background: "var(--surface-2)", border: "none", color: "var(--ink)", cursor: "pointer", fontFamily: "inherit" };
-
-// Desktop/tablet (>=820px): a real keyboard makes the tap-numpad pure overhead, and
-// there's room for a centered dialog instead of a thumb-reachable bottom sheet — chip
-// rows can wrap instead of horizontal-scrolling so every option is a single click.
-const responsiveCss = `
-  .qa-amt-input{display:none}
-  .qa-numpad{display:grid}
-  @media(min-width:820px){
-    .qa-overlay{align-items:center}
-    .qa-sheet{max-width:480px;border-radius:20px;padding-bottom:20px;max-height:86vh}
-    .qa-grabber{display:none}
-    .qa-amt-display{display:none}
-    .qa-amt-input{display:flex}
-    .qa-numpad{display:none}
-    .qa-row{flex-wrap:wrap;overflow-x:visible}
-  }
-`;

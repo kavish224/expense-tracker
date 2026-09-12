@@ -1,4 +1,28 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+
+/* Maps our existing design tokens (below) onto Tailwind v4's CSS-first theme so
+   shadcn-style components (Dialog, Drawer, Button, Toggle Group, ...) can use
+   plain utility classes (bg-surface-1, text-ink-muted, border-hairline, ...)
+   instead of one-off inline styles — without touching any existing page, which
+   still reads the same var(--...) custom properties directly. */
+@theme inline {
+  --color-background: var(--bg-canvas);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-tint: var(--accent-tint);
+  --color-pos: var(--pos);
+  --color-neg: var(--neg);
+  --color-warn: var(--warn);
+}
 
 /* ============================================================
    Design tokens v2 — dark-default, premium fintech aesthetic.

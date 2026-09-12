@@ -10,6 +10,10 @@ export interface TxnLite {
   accountId: string;
   accountName: string;
   merchantName?: string;
+  // Real category id (distinct from categoryKey, which is the colorToken used
+  // for grouping/coloring) — only needed for the per-day category breakdown
+  // that powers click-to-filter, so it's optional everywhere else.
+  categoryId?: string;
 }
 
 export interface Kpis {
@@ -74,6 +78,41 @@ export function dailySeries(txns: TxnLite[], start: Date, end: Date) {
     cur.setDate(cur.getDate() + 1);
   }
   return days;
+}
+
+// Per-day category totals (by real category id, not colorToken) — powers
+// click-a-day-to-filter on the trend chart without a second round-trip.
+export function dailyCategorySeries(txns: TxnLite[], start: Date, end: Date) {
+  const map = new Map<string, Map<string, number>>();
+  for (const t of spends(txns)) {
+    if (!t.categoryId) continue;
+    const day = t.txnDatetime.toISOString().slice(0, 10);
+    const dayMap = map.get(day) ?? new Map<string, number>();
+    dayMap.set(t.categoryId, (dayMap.get(t.categoryId) || 0) + t.amount);
+    map.set(day, dayMap);
+  }
+  const out: { date: string; categories: Record<string, number> }[] = [];
+  const cur = new Date(start);
+  while (cur <= end) {
+    const k = cur.toISOString().slice(0, 10);
+    const dayMap = map.get(k);
+    out.push({
+      date: k,
+      categories: dayMap ? Object.fromEntries([...dayMap.entries()].map(([id, a]) => [id, round(a)])) : {},
+    });
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
+}
+
+// The equivalent-length window immediately preceding [start, end] — used to
+// compute period-over-period deltas for any period type (week/month/quarter/
+// custom) without special-casing each one.
+export function previousPeriodRange(start: Date, end: Date) {
+  const durationMs = end.getTime() - start.getTime();
+  const prevEnd = new Date(start.getTime() - 1);
+  const prevStart = new Date(prevEnd.getTime() - durationMs);
+  return { start: prevStart, end: prevEnd };
 }
 
 // Recurring detection: same merchant, similar amount, ~monthly cadence, ≥2 hits.

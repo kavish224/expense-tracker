@@ -4,7 +4,13 @@ import { formatINR } from "./ui";
 
 // Spending calendar heatmap (Zerodha Console P&L-heatmap pattern), single-hue
 // intensity ramp so it reads as "how much" without red/green guilt colouring.
-export function Heatmap({ data }: { data: { date: string; amount: number }[] }) {
+export function Heatmap({
+  data, selectedDate, onSelect,
+}: {
+  data: { date: string; amount: number }[];
+  selectedDate?: string | null;
+  onSelect?: (date: string | null) => void;
+}) {
   if (!data.length) return null;
   const max = Math.max(...data.map((d) => d.amount), 1);
 
@@ -29,15 +35,19 @@ export function Heatmap({ data }: { data: { date: string; amount: number }[] }) 
               const c = w[di];
               if (!c) return <div key={di} style={{ width: size, height: size }} />;
               const op = intensity(c.amount);
+              const selected = selectedDate === c.date;
               return (
                 <div
                   key={di}
+                  onClick={onSelect ? () => onSelect(selected ? null : c.date) : undefined}
                   title={`${new Date(c.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} · ${formatINR(c.amount)}`}
                   style={{
                     width: size, height: size, borderRadius: 3,
                     background: op === 0 ? "var(--surface-2)" : "var(--accent)",
                     opacity: op === 0 ? 1 : op,
-                    border: "1px solid var(--hairline)",
+                    border: selected ? "1.5px solid var(--ink)" : "1px solid var(--hairline)",
+                    boxShadow: selected ? "0 0 0 2px var(--accent-glow)" : "none",
+                    cursor: onSelect ? "pointer" : "default",
                   }}
                 />
               );

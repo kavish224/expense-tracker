@@ -1,7 +1,8 @@
 "use client";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, Overline, Glyph, formatINR } from "@/components/ui";
+import { AreaChart, Area, ResponsiveContainer } from "recharts";
+import { Card, Overline, Glyph, Button, formatINR } from "@/components/ui";
 import { useShell } from "@/components/AppShell";
 
 interface T {
@@ -73,13 +74,17 @@ export function HomeClient({
                     <div style={{ fontSize: 12, color: "var(--ink-subtle)" }}>{t.account.name} · {t.source === "EMAIL" ? "email alert" : "imported"}</div>
                   </div>
                   <div className="num" style={{ fontSize: 14, fontWeight: 600 }}>{formatINR(t.amount)}</div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); confirm(t.id); }}
-                    disabled={isConfirming}
-                    style={{ background: "var(--accent-tint)", color: "var(--accent)", border: "none", borderRadius: 8, padding: "6px 10px", fontSize: 12, fontWeight: 600, cursor: isConfirming ? "default" : "pointer", opacity: isConfirming ? 0.6 : 1, minWidth: 64 }}
-                  >
-                    {isConfirming ? "Confirming…" : "Confirm"}
-                  </button>
+                  <span onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={isConfirming}
+                      onClick={() => confirm(t.id)}
+                      style={{ minWidth: 64, background: "var(--accent-tint)", color: "var(--accent)", borderColor: "transparent" }}
+                    >
+                      {isConfirming ? "Confirming…" : "Confirm"}
+                    </Button>
+                  </span>
                 </div>
               );
             })}
@@ -89,7 +94,7 @@ export function HomeClient({
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "22px 2px 10px" }}>
         <span style={{ fontSize: 13, fontWeight: 600 }}>Recent</span>
-        <button onClick={openQuickAdd} style={{ background: "none", border: "none", color: "var(--accent)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>+ Quick add</button>
+        <Button variant="ghost" size="sm" onClick={openQuickAdd} style={{ color: "var(--accent)", padding: "4px 8px" }}>+ Quick add</Button>
       </div>
       <Card>
         {recent.length === 0 && <div style={{ padding: 24, textAlign: "center", color: "var(--ink-subtle)", fontSize: 14 }}>No transactions yet. Press <span className="kbd">A</span> to log one.</div>}
@@ -113,14 +118,26 @@ export function HomeClient({
   );
 }
 
+// Recharts-backed spark chart (Tremor's SparkAreaChart pattern: axis-less,
+// chrome-free, just the shape) rather than hand-rolled SVG polyline math —
+// that math divided by (data.length - 1), which is a division by zero (NaN
+// point) whenever exactly one day of spend existed so far this month.
 function Sparkline({ data }: { data: number[] }) {
   if (!data.length) return null;
-  const max = Math.max(...data, 1);
-  const w = 100, h = 34;
-  const pts = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - (v / max) * (h - 4) - 2}`).join(" ");
+  const points = data.map((v, i) => ({ i, v }));
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ width: "100%", height: 34, marginTop: 12 }}>
-      <polyline points={pts} fill="none" stroke="var(--accent)" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
+    <div style={{ width: "100%", height: 34, marginTop: 12 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={points} margin={{ top: 2, right: 0, bottom: 2, left: 0 }}>
+          <defs>
+            <linearGradient id="homeSparkGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <Area type="monotone" dataKey="v" stroke="var(--accent)" strokeWidth={1.5} fill="url(#homeSparkGrad)" isAnimationActive={false} dot={false} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
   );
 }

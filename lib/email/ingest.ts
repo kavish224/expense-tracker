@@ -30,6 +30,17 @@ export function matchByHint(pool: Account[], hint: string | undefined): Account 
   });
 }
 
+// Only safe to auto-default when there is exactly one candidate — with two or
+// more, guessing has a real chance of silently filing a transaction under the
+// wrong bank entirely (found via a real false positive: an HDFC EMI debit alert,
+// whose account hint matched none of the user's accounts, got defaulted onto an
+// unrelated ICICI credit card). An unmatched alert with genuine ambiguity should
+// come back as "no-account" — dropped rather than misfiled, to be caught by the
+// user's periodic statement reconciliation instead.
+function soleAccountOrUndefined(pool: Account[]): Account | undefined {
+  return pool.length === 1 ? pool[0] : undefined;
+}
+
 export async function createTransactionFromAlert(
   userId: string,
   alert: ParsedAlert,
@@ -53,7 +64,7 @@ export async function createTransactionFromAlert(
     // the paying account there first, since accountHint on these alerts is
     // the paying bank, not the card. transferToHint (the card being paid) is
     // resolved separately, against card accounts specifically.
-    account = matchByHint(bankAccounts, alert.accountHint) ?? bankAccounts[0];
+    account = matchByHint(bankAccounts, alert.accountHint) ?? soleAccountOrUndefined(bankAccounts);
     transferAccount = matchByHint(cardAccounts, alert.transferToHint);
   } else if (alert.creditCardFunded) {
     // RuPay-on-UPI: rail is UPI, but the funding account is the card, not a bank.
@@ -61,7 +72,7 @@ export async function createTransactionFromAlert(
   } else {
     account = matchByHint(nonCashAccounts, alert.accountHint);
   }
-  if (!account) account = cardAccounts[0] ?? nonCashAccounts[0];
+  if (!account) account = soleAccountOrUndefined(nonCashAccounts);
   if (!account) return { ok: false, reason: "no-account" };
 
   // A resent/double-forwarded alert (or a Gmail-poll retry racing its own
@@ -122,10 +133,11 @@ export async function createTransactionFromAlert(
       txnDatetime: alert.when,
       source: "EMAIL",
       confidence: cat.confidence,
-      // A matched rule (confidence 1) is a certainty the user already declared —
-      // skip the review queue. Anything else from an unattended email alert still
-      // needs a human glance before it counts toward spend.
-      isReviewed: cat.confidence >= 1,
+      // Every email-ingested transaction lands in the review queue, regardless of
+      // category confidence — the user's workflow is same-day auto-capture via
+      // Gmail, then a nightly pass to confirm the day's batch, so "reviewed" should
+      // mean "the user actually looked at it," not "the categorizer felt sure."
+      isReviewed: false,
       rawNarration: rawBody.slice(0, 500),
     },
   });

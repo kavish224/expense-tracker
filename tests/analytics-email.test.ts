@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { kpis, byCategory, byAccount, dailySeries, recurring, periodRange, type TxnLite } from "@/lib/analytics/aggregate";
+import { kpis, byCategory, byAccount, dailySeries, dailyCategorySeries, previousPeriodRange, recurring, periodRange, type TxnLite } from "@/lib/analytics/aggregate";
 import { parseAlertEmail } from "@/lib/email/parse";
 import { redact, validateGrounded, type RawLlmRow } from "@/lib/llm/adapter";
 import { groundAlertOutput } from "@/lib/llm/email-adapter";
@@ -53,6 +53,23 @@ describe("analytics", () => {
   test("periodRange month starts on the 1st", () => {
     const { start } = periodRange("month", new Date("2026-07-22"));
     expect(start.getDate()).toBe(1);
+  });
+  test("previousPeriodRange returns the immediately preceding equal-length window", () => {
+    const { start, end } = previousPeriodRange(new Date("2026-07-01T00:00:00Z"), new Date("2026-07-31T23:59:59.999Z"));
+    expect(end.getTime()).toBe(new Date("2026-07-01T00:00:00Z").getTime() - 1);
+    expect(end.getTime() - start.getTime()).toBe(new Date("2026-07-31T23:59:59.999Z").getTime() - new Date("2026-07-01T00:00:00Z").getTime());
+  });
+  test("dailyCategorySeries groups per-day spend by category id", () => {
+    const withCats: TxnLite[] = [
+      { amount: 420, direction: "DEBIT", txnDatetime: new Date("2026-07-22"), categoryKey: "food", categoryId: "cat-food", accountId: "a1", accountName: "HDFC" },
+      { amount: 268, direction: "DEBIT", txnDatetime: new Date("2026-07-22"), categoryKey: "transport", categoryId: "cat-transport", accountId: "a2", accountName: "ICICI" },
+      { amount: 649, direction: "DEBIT", txnDatetime: new Date("2026-07-20"), categoryKey: "bills", categoryId: "cat-bills", accountId: "a1", accountName: "HDFC" },
+    ];
+    const s = dailyCategorySeries(withCats, new Date("2026-07-20"), new Date("2026-07-22"));
+    expect(s.length).toBe(3);
+    expect(s[0].categories["cat-bills"]).toBe(649);
+    expect(s[2].categories).toEqual({ "cat-food": 420, "cat-transport": 268 });
+    expect(s[1].categories).toEqual({});
   });
 });
 
@@ -160,6 +177,29 @@ describe("email parse + redaction", () => {
         "Sit Back And Relax. Your M-Now Order Is Confirmed on Sun, 26 Jul We know you can't wait to receive your order! With M-Now, your item(s) will reach you extra fast. Price breakup * MRP * ₹799.00 * Discount * - ₹632.00 * Platform Fee * ₹23.00 * Total Amount * ₹190.00 * Net Paid * ₹190.00 * Sold by: Omnitech Retail. Paid by ICICI Credit Card ending in 4003",
         "Your M-Now Myntra Order Confirmation.",
         "updates@myntra.com"
+      );
+      expect(a).toBeNull();
+    });
+
+    // Regression: two real false positives found via live Gmail polling — a flight
+    // booking confirmation (whose future travel date got misread as the transaction
+    // date) and a restaurant table-booking confirmation, both fooled the amount+verb
+    // proximity check via an incidental "amount paid" line describing the booking,
+    // not a bank/wallet transaction.
+    test("rejects a flight-booking confirmation despite its 'amount paid' line", () => {
+      const a = parseAlertEmail(
+        "Your booking is confirmed! Booking ID 27505295235. Flight IndiGo 6E-204, Departure 06 Nov, 14:30. Amount paid ₹7,769.00. 24x7 Flights Helpline: 1800-123-4567.",
+        "Booking Confirmed - Flight to Goa",
+        "noreply@travelbooking.example"
+      );
+      expect(a).toBeNull();
+    });
+
+    test("rejects a restaurant table-booking confirmation despite its paid amount", () => {
+      const a = parseAlertEmail(
+        "TABLE BOOKING CONFIRMED at Grace Restaurant for 2 guests on 05 Sep, 8:00 PM. Advance amount of ₹15.00 paid to reserve your table.",
+        "Your table booking is confirmed",
+        "reservations@dineout.example"
       );
       expect(a).toBeNull();
     });

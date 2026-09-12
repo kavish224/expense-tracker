@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUserId } from "@/lib/user";
-import { exchangeGmailCode } from "@/lib/email/gmail";
+import { exchangeGmailCode, verifyOAuthState } from "@/lib/email/gmail";
+import { encryptSecret } from "@/lib/crypto";
 import { prisma } from "@/lib/db";
 
 // Google redirects here after consent. Exchanges the code for a refresh token
-// and stores it on the current user's row — see lib/email/gmail.ts for how
-// pollGmailForAlerts() consumes it, and how it gets cleared (with
+// and stores it (encrypted) on the current user's row — see lib/email/gmail.ts
+// for how pollGmailForAlerts() consumes it, and how it gets cleared (with
 // gmailNeedsReconnect set) if Google later revokes/expires it.
 export async function GET(req: NextRequest) {
   const userId = await requireUserId();
 
   const code = req.nextUrl.searchParams.get("code");
   const error = req.nextUrl.searchParams.get("error");
+  const state = req.nextUrl.searchParams.get("state");
   const settingsUrl = new URL("/settings", req.nextUrl.origin);
 
   if (error) {
@@ -24,13 +26,20 @@ export async function GET(req: NextRequest) {
     settingsUrl.searchParams.set("reason", "missing_code");
     return NextResponse.redirect(settingsUrl);
   }
+  // CSRF guard (RFC 6749 §10.12) — the state must be the one this same signed-in
+  // user's /oauth/start call minted, within its 10-minute window.
+  if (!verifyOAuthState(state, userId)) {
+    settingsUrl.searchParams.set("gmail", "error");
+    settingsUrl.searchParams.set("reason", "invalid_state");
+    return NextResponse.redirect(settingsUrl);
+  }
 
   try {
     const redirectUri = new URL("/api/gmail/oauth/callback", req.nextUrl.origin).toString();
     const { refreshToken, email } = await exchangeGmailCode(code, redirectUri);
     await prisma.user.update({
       where: { id: userId },
-      data: { gmailRefreshToken: refreshToken, gmailEmail: email, gmailConnectedAt: new Date(), gmailNeedsReconnect: false },
+      data: { gmailRefreshToken: encryptSecret(refreshToken), gmailEmail: email, gmailConnectedAt: new Date(), gmailNeedsReconnect: false },
     });
     settingsUrl.searchParams.set("gmail", "connected");
   } catch (err) {
