@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function StatementsPage() {
   const userId = await requireUserId();
-  const { accounts } = await getShellData(userId);
+  const { accounts, categories } = await getShellData(userId);
   // Every non-archived account (ledger + investment) is a valid transfer/settlement
   // destination when linking a statement row — investment accounts specifically
   // aren't in `accounts` above since they carry no transaction ledger of their own.
@@ -18,7 +18,7 @@ export default async function StatementsPage() {
   });
   return (
     <Suspense fallback={null}>
-      <StatementsClient accounts={accounts} linkableAccounts={linkableAccounts} />
+      <StatementsClient accounts={accounts} linkableAccounts={linkableAccounts} categories={categories} />
     </Suspense>
   );
 }

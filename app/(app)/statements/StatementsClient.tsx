@@ -2,15 +2,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { DataGrid, type Column, type RenderCellProps, type SortColumn } from "react-data-grid";
 import "react-data-grid/lib/styles.css";
-import type { ShellAccount } from "@/lib/user";
+import type { ShellAccount, ShellCategory } from "@/lib/user";
 import { formatINR } from "@/components/ui";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/primitives/tabs";
 import { Badge } from "@/components/primitives/badge";
-import { Input } from "@/components/primitives/input";
+import { Input, Label } from "@/components/primitives/input";
 import { Button } from "@/components/primitives/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/primitives/popover";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/primitives/select";
-import { Highlighter, Link2, Link2Off, Tag } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/primitives/dialog";
+import { ToggleGroup, ToggleGroupItem } from "@/components/primitives/toggle-group";
+import { Highlighter, Link2, Link2Off, Pencil, PiggyBank, Tag } from "lucide-react";
 
 interface LinkableAccount {
   id: string;
@@ -73,7 +75,15 @@ async function patchTxn(id: string, data: Record<string, unknown>) {
   return res.json();
 }
 
-export function StatementsClient({ accounts, linkableAccounts }: { accounts: ShellAccount[]; linkableAccounts: LinkableAccount[] }) {
+export function StatementsClient({
+  accounts,
+  linkableAccounts,
+  categories,
+}: {
+  accounts: ShellAccount[];
+  linkableAccounts: LinkableAccount[];
+  categories: ShellCategory[];
+}) {
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
   const [data, setData] = useState<StatementData | null>(null);
   const [q, setQ] = useState("");
@@ -141,6 +151,7 @@ export function StatementsClient({ accounts, linkableAccounts }: { accounts: She
                 q={q}
                 setQ={setQ}
                 linkableAccounts={linkableAccounts.filter((la) => la.id !== a.id)}
+                categories={categories}
                 onTxnUpdated={(updated) =>
                   setData((prev) =>
                     prev ? { ...prev, transactions: prev.transactions.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)) } : prev
@@ -162,6 +173,7 @@ function StatementGrid({
   q,
   setQ,
   linkableAccounts,
+  categories,
   onTxnUpdated,
 }: {
   accountId: string;
@@ -170,6 +182,7 @@ function StatementGrid({
   q: string;
   setQ: (v: string) => void;
   linkableAccounts: LinkableAccount[];
+  categories: ShellCategory[];
   onTxnUpdated: (t: Partial<StatementTxn> & { id: string }) => void;
 }) {
   const [sortColumns, setSortColumns] = useState<readonly SortColumn[]>([{ columnKey: "txnDatetime", direction: "DESC" }]);
@@ -318,7 +331,7 @@ function StatementGrid({
         sortable: false,
         cellClass: cellClassFor("status"),
         renderCell: ({ row }) => (
-          <StatusCell txn={row} linkableAccounts={linkableAccounts} onSaved={onTxnUpdated} />
+          <StatusCell txn={row} linkableAccounts={linkableAccounts} categories={categories} onSaved={onTxnUpdated} />
         ),
       },
       {
@@ -346,7 +359,7 @@ function StatementGrid({
         renderCell: ({ row }) => <span>{formatINR(row.runningBalance)}</span>,
       },
     ],
-    [cellClassFor, linkableAccounts, onTxnUpdated]
+    [cellClassFor, linkableAccounts, categories, onTxnUpdated]
   );
 
   if (error) return <p className="text-ink-subtle p-6 text-center">Couldn&apos;t load this statement.</p>;
@@ -474,19 +487,27 @@ function TagPicker({ txn, onSaved }: { txn: StatementTxn; onSaved: (t: Partial<S
 function StatusCell({
   txn,
   linkableAccounts,
+  categories,
   onSaved,
 }: {
   txn: StatementTxn;
   linkableAccounts: LinkableAccount[];
+  categories: ShellCategory[];
   onSaved: (t: Partial<StatementTxn> & { id: string }) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [convertAs, setConvertAs] = useState<"TRANSFER" | "INVESTMENT">("TRANSFER");
   const [target, setTarget] = useState(txn.transferAccountId ?? "");
   const [saving, setSaving] = useState(false);
 
   const isTransfer = txn.kind === "TRANSFER";
   const isInvestment = isTransfer && txn.transferAccountType === "INVESTMENT";
   const needsReview = !txn.isReviewed;
+
+  const transferAccounts = linkableAccounts.filter((a) => a.type !== "INVESTMENT");
+  const investmentAccounts = linkableAccounts.filter((a) => a.type === "INVESTMENT");
+  const conversionOptions = convertAs === "INVESTMENT" ? investmentAccounts : transferAccounts;
 
   const badge = isInvestment ? (
     <Badge variant="accent">Investment</Badge>
@@ -500,12 +521,19 @@ function StatusCell({
     <Badge variant="warning">Uncategorized</Badge>
   );
 
-  async function link() {
+  async function link(asType: "TRANSFER" | "INVESTMENT") {
     if (!target) return;
     setSaving(true);
     try {
-      const { transaction } = await patchTxn(txn.id, { kind: "TRANSFER", transferAccountId: target });
-      onSaved({ id: txn.id, kind: "TRANSFER", transferAccountId: target, transferAccountName: transaction.transferAccount?.name ?? null, transferAccountType: transaction.transferAccount?.type ?? null });
+      await patchTxn(txn.id, { kind: "TRANSFER", transferAccountId: target });
+      const acc = linkableAccounts.find((a) => a.id === target);
+      onSaved({
+        id: txn.id,
+        kind: "TRANSFER",
+        transferAccountId: target,
+        transferAccountName: acc?.name ?? null,
+        transferAccountType: asType === "INVESTMENT" ? "INVESTMENT" : (acc?.type ?? null),
+      });
       setOpen(false);
     } finally {
       setSaving(false);
@@ -524,61 +552,198 @@ function StatusCell({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button type="button" className="flex h-full w-full items-center gap-1.5 px-1 text-left">
-          {badge}
-          {isTransfer && txn.transferAccountName && (
-            <span className="text-[11px] text-ink-subtle truncate">→ {txn.transferAccountName}</span>
-          )}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-72">
-        {isTransfer ? (
-          <>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-subtle mb-2">
-              Linked {isInvestment ? "investment" : "settlement"}
-            </p>
-            <p className="text-[13px] mb-3">
-              Money moved to <strong className="text-ink">{txn.transferAccountName}</strong>
-            </p>
-            <Select value={target} onValueChange={setTarget}>
-              <SelectTrigger><SelectValue placeholder="Change destination…" /></SelectTrigger>
-              <SelectContent>
-                {linkableAccounts.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="flex gap-2 mt-2">
-              <Button size="sm" onClick={link} disabled={saving || target === txn.transferAccountId} className="flex-1">
-                <Link2 size={13} className="mr-1" /> Update
-              </Button>
-              <Button size="sm" variant="ghost" onClick={unlink} disabled={saving} className="flex-1">
-                <Link2Off size={13} className="mr-1" /> Unlink
+    <>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button type="button" className="flex h-full w-full items-center gap-1.5 px-1 text-left">
+            {badge}
+            {isTransfer && txn.transferAccountName && (
+              <span className="text-[11px] text-ink-subtle truncate">→ {txn.transferAccountName}</span>
+            )}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-72">
+          <Button
+            size="sm"
+            variant="secondary"
+            className="w-full mb-3"
+            onClick={() => {
+              setOpen(false);
+              setEditOpen(true);
+            }}
+          >
+            <Pencil size={13} className="mr-1" /> Edit transaction
+          </Button>
+
+          {isTransfer ? (
+            <>
+              <div className="border-t border-hairline pt-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-subtle mb-2">
+                  Linked {isInvestment ? "investment" : "settlement"}
+                </p>
+                <p className="text-[13px] mb-3">
+                  Money moved to <strong className="text-ink">{txn.transferAccountName}</strong>
+                </p>
+                <Select value={target} onValueChange={setTarget}>
+                  <SelectTrigger><SelectValue placeholder="Change destination…" /></SelectTrigger>
+                  <SelectContent>
+                    {linkableAccounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex gap-2 mt-2">
+                  <Button size="sm" onClick={() => link(isInvestment ? "INVESTMENT" : "TRANSFER")} disabled={saving || target === txn.transferAccountId} className="flex-1">
+                    <Link2 size={13} className="mr-1" /> Update
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={unlink} disabled={saving} className="flex-1">
+                    <Link2Off size={13} className="mr-1" /> Unlink
+                  </Button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="border-t border-hairline pt-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-subtle mb-2">Convert this row</p>
+              <p className="text-[12px] text-ink-subtle mb-2">
+                Use this when the row is really a self-transfer/settlement or an investment contribution/withdrawal, not real spend.
+              </p>
+              <ToggleGroup
+                type="single"
+                value={convertAs}
+                onValueChange={(v) => {
+                  if (!v) return;
+                  setConvertAs(v as "TRANSFER" | "INVESTMENT");
+                  setTarget("");
+                }}
+                className="flex gap-2 mb-2"
+              >
+                <ToggleGroupItem value="TRANSFER" className="flex-1 justify-center">
+                  <Link2 size={13} /> Transfer
+                </ToggleGroupItem>
+                <ToggleGroupItem value="INVESTMENT" className="flex-1 justify-center">
+                  <PiggyBank size={13} /> Investment
+                </ToggleGroupItem>
+              </ToggleGroup>
+              <Select value={target} onValueChange={setTarget}>
+                <SelectTrigger>
+                  <SelectValue placeholder={convertAs === "INVESTMENT" ? "Investment platform…" : "Destination account…"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {conversionOptions.length === 0 ? (
+                    <div className="px-3 py-2 text-[12px] text-ink-subtle">
+                      {convertAs === "INVESTMENT" ? "No investment accounts yet — add one under Accounts." : "No other accounts."}
+                    </div>
+                  ) : (
+                    conversionOptions.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <Button size="sm" onClick={() => link(convertAs)} disabled={saving || !target} className="w-full mt-2">
+                <Link2 size={13} className="mr-1" /> Convert to {convertAs === "INVESTMENT" ? "investment" : "transfer"}
               </Button>
             </div>
-          </>
-        ) : (
-          <>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-subtle mb-2">Mark as transfer</p>
-            <p className="text-[12px] text-ink-subtle mb-2">
-              Use this when the row is really a self-transfer or investment contribution/withdrawal, not real spend.
-            </p>
-            <Select value={target} onValueChange={setTarget}>
-              <SelectTrigger><SelectValue placeholder="Destination account…" /></SelectTrigger>
-              <SelectContent>
-                {linkableAccounts.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button size="sm" onClick={link} disabled={saving || !target} className="w-full mt-2">
-              <Link2 size={13} className="mr-1" /> Link as transfer
-            </Button>
-          </>
-        )}
-      </PopoverContent>
-    </Popover>
+          )}
+        </PopoverContent>
+      </Popover>
+
+      <EditTransactionDialog
+        key={editOpen ? `edit-${txn.id}` : "closed"}
+        txn={txn}
+        categories={categories}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onSaved={onSaved}
+      />
+    </>
+  );
+}
+
+function EditTransactionDialog({
+  txn,
+  categories,
+  open,
+  onOpenChange,
+  onSaved,
+}: {
+  txn: StatementTxn;
+  categories: ShellCategory[];
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onSaved: (t: Partial<StatementTxn> & { id: string }) => void;
+}) {
+  const [amount, setAmount] = useState(String(txn.amount));
+  const [date, setDate] = useState(txn.txnDatetime.slice(0, 10));
+  const [note, setNote] = useState(txn.note ?? "");
+  const [categoryId, setCategoryId] = useState(txn.categoryId ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    const parsedAmount = Number(amount);
+    if (!parsedAmount || parsedAmount <= 0) return;
+    setSaving(true);
+    try {
+      const { transaction } = await patchTxn(txn.id, {
+        amount: parsedAmount,
+        txnDatetime: new Date(date).toISOString(),
+        note,
+        categoryId: categoryId || null,
+      });
+      onSaved({
+        id: txn.id,
+        amount: transaction.amount,
+        txnDatetime: transaction.txnDatetime,
+        note: transaction.note,
+        categoryId: transaction.category?.id ?? null,
+        categoryName: transaction.category?.name ?? null,
+        categoryColorToken: transaction.category?.colorToken ?? null,
+        isReviewed: true,
+      });
+      onOpenChange(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit transaction</DialogTitle>
+        </DialogHeader>
+        <p className="text-[13px] text-ink-subtle mb-4 -mt-2">{txn.merchantName || txn.rawNarration}</p>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label>Amount</Label>
+            <Input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          </div>
+          <div>
+            <Label>Date</Label>
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+        </div>
+        <div className="mt-4">
+          <Label>Category</Label>
+          <Select value={categoryId} onValueChange={setCategoryId}>
+            <SelectTrigger><SelectValue placeholder="Uncategorized" /></SelectTrigger>
+            <SelectContent>
+              {categories.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="mt-4">
+          <Label>Note</Label>
+          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional note" />
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>Save changes</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
