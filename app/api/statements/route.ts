@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   const txns = await prisma.transaction.findMany({
     where: { userId, accountId },
     orderBy: { txnDatetime: "asc" },
-    include: { category: true },
+    include: { category: true, transferAccount: true },
   });
 
   let running = Number(account.openingBalance);
@@ -34,9 +34,17 @@ export async function GET(req: NextRequest) {
       txnDatetime: t.txnDatetime,
       merchantName: t.merchantName,
       rawNarration: t.rawNarration,
+      note: t.note,
+      categoryId: t.categoryId,
       categoryName: t.category?.name ?? null,
       categoryColorToken: t.category?.colorToken ?? null,
       kind: t.kind,
+      transferAccountId: t.transferAccountId,
+      transferAccountName: t.transferAccount?.name ?? null,
+      transferAccountType: t.transferAccount?.type ?? null,
+      isReviewed: t.isReviewed,
+      confidence: t.confidence,
+      tagColor: t.tagColor,
       source: t.source,
       runningBalance: Math.round(running * 100) / 100,
     };

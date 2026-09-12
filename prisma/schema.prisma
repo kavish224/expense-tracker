@@ -185,6 +185,9 @@ model Transaction {
   // this transaction ("not a transfer") — keeps it from being re-suggested on
   // every future scan without requiring a second table just to store rejections.
   transferIgnored Boolean    @default(false)
+  // User-applied row highlight in the Statements grid (a hex color or a named
+  // swatch token, e.g. "amber") — purely a visual flag, no business meaning.
+  tagColor       String?
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 

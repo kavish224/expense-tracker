@@ -206,3 +206,47 @@ body {
 /* data-table row hover */
 .trow { transition: background .12s ease; }
 .trow:hover td { background: var(--surface-2); }
+
+/* react-data-grid theming — maps the grid's own CSS variables onto our
+   existing design tokens instead of adopting its default light/dark palette,
+   so it reads as part of this app rather than a bolted-on widget. */
+.rdg-shell {
+  --rdg-selection-width: 2px;
+  --rdg-selection-color: var(--accent);
+  --rdg-font-size: 13px;
+  --rdg-border-width: 1px;
+  --rdg-color: var(--ink);
+  --rdg-border-color: var(--hairline);
+  --rdg-summary-border-color: var(--hairline-strong);
+  --rdg-background-color: var(--surface-1);
+  --rdg-header-background-color: var(--surface-2);
+  --rdg-header-draggable-background-color: var(--surface-3);
+  --rdg-row-hover-background-color: var(--surface-2);
+  --rdg-row-selected-background-color: var(--accent-tint);
+  --rdg-row-selected-hover-background-color: var(--accent-tint);
+  --rdg-checkbox-focus-color: var(--accent);
+  block-size: 100%;
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.rdg-shell .rdg-cell { border-inline-end: 1px solid transparent; }
+.rdg-shell .rdg-header-row .rdg-cell {
+  font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-subtle);
+}
+
+/* Persisted per-row color tags (a lightweight "flag this row" marker, not a
+   category) — applied as a left accent bar + faint tint so it reads at a
+   glance without fighting the status/category badge in the same row. */
+.rdg-tag-amber  { box-shadow: inset 3px 0 0 var(--warn); background: color-mix(in srgb, var(--warn) 8%, transparent); }
+.rdg-tag-rose   { box-shadow: inset 3px 0 0 var(--neg);  background: color-mix(in srgb, var(--neg) 8%, transparent); }
+.rdg-tag-green  { box-shadow: inset 3px 0 0 var(--pos);  background: color-mix(in srgb, var(--pos) 8%, transparent); }
+.rdg-tag-blue   { box-shadow: inset 3px 0 0 var(--c-transport); background: color-mix(in srgb, var(--c-transport) 8%, transparent); }
+.rdg-tag-violet { box-shadow: inset 3px 0 0 var(--c-shop); background: color-mix(in srgb, var(--c-shop) 8%, transparent); }
+
+/* Session-only free highlighter (localStorage, not persisted server-side) —
+   a plain saturated tint distinct from the tag accent bar above. */
+.rdg-hl-yellow { background: color-mix(in srgb, var(--warn) 22%, transparent) !important; }
+.rdg-hl-green  { background: color-mix(in srgb, var(--pos) 20%, transparent) !important; }
+.rdg-hl-blue   { background: color-mix(in srgb, var(--c-transport) 20%, transparent) !important; }
+.rdg-hl-pink   { background: color-mix(in srgb, var(--c-health) 20%, transparent) !important; }

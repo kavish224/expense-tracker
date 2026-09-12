@@ -16,6 +16,7 @@ const patchSchema = z.object({
   txnDatetime: z.string().optional(),
   kind: z.enum(["EXPENSE", "TRANSFER"]).optional(),
   transferAccountId: z.string().nullable().optional(),
+  tagColor: z.string().max(20).nullable().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -36,9 +37,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Invalid transaction" }, { status: 400 });
   if (d.transferAccountId && !(await assertOwnedAccount(userId, d.transferAccountId)))
     return NextResponse.json({ error: "Invalid transaction" }, { status: 400 });
+  if (d.transferAccountId && d.transferAccountId === (d.accountId ?? owned.accountId))
+    return NextResponse.json({ error: "A transfer can't point at its own account" }, { status: 400 });
 
   const data: any = {};
-  for (const k of ["categoryId", "merchantName", "note", "amount", "isReviewed", "paymentRail", "accountId", "kind", "transferAccountId"] as const) {
+  for (const k of ["categoryId", "merchantName", "note", "amount", "isReviewed", "paymentRail", "accountId", "kind", "transferAccountId", "tagColor"] as const) {
     if (d[k] !== undefined) data[k] = d[k];
   }
   // Switching back to a plain expense drops any leftover counterparty link.
