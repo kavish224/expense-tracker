@@ -420,7 +420,6 @@ function StatementGrid({
             event.preventGridDefault();
             toggleHighlight(`${args.row.id}:${args.column.key}`);
           }}
-          className="rdg-light"
           style={{ blockSize: "100%" }}
         />
       </div>

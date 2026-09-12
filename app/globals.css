@@ -34,6 +34,10 @@
    ============================================================ */
 :root,
 [data-theme="dark"] {
+  /* Lets native form controls and any CSS light-dark() value (used by
+     third-party components like react-data-grid) resolve to this app's
+     actual dark-first default instead of the browser's own light default. */
+  color-scheme: dark;
   --bg-canvas: #0A0A0C;
   --surface-1: #141418;
   --surface-2: #1C1C22;
@@ -77,6 +81,7 @@
 }
 
 [data-theme="light"] {
+  color-scheme: light;
   --bg-canvas: #FBFBFA;
   --surface-1: #FFFFFF;
   --surface-2: #F4F4F5;
@@ -209,8 +214,15 @@ body {
 
 /* react-data-grid theming — maps the grid's own CSS variables onto our
    existing design tokens instead of adopting its default light/dark palette,
-   so it reads as part of this app rather than a bolted-on widget. */
-.rdg-shell {
+   so it reads as part of this app rather than a bolted-on widget.
+   The library sets these same variables directly on its own root element
+   (the one carrying the `.rdg` class) from inside a CSS `@layer`. A rule on
+   an ancestor (`.rdg-shell`) only supplies an *inherited* value, which never
+   wins over a value the element sets on itself — so the override has to
+   target `.rdg` directly; being unlayered, it then outranks the library's
+   layered default regardless of specificity. */
+.rdg-shell { block-size: 100%; border: 1px solid var(--hairline); border-radius: 14px; overflow: hidden; }
+.rdg-shell .rdg {
   --rdg-selection-width: 2px;
   --rdg-selection-color: var(--accent);
   --rdg-font-size: 13px;
@@ -225,14 +237,11 @@ body {
   --rdg-row-selected-background-color: var(--accent-tint);
   --rdg-row-selected-hover-background-color: var(--accent-tint);
   --rdg-checkbox-focus-color: var(--accent);
-  block-size: 100%;
-  border: 1px solid var(--hairline);
-  border-radius: 14px;
-  overflow: hidden;
 }
-.rdg-shell .rdg-cell { border-inline-end: 1px solid transparent; }
+.rdg-shell .rdg-cell { border-inline-end: 1px solid transparent; background-color: var(--surface-1); }
 .rdg-shell .rdg-header-row .rdg-cell {
   font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-subtle);
+  background-color: var(--surface-2);
 }
 
 /* Persisted per-row color tags (a lightweight "flag this row" marker, not a
