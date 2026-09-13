@@ -7,14 +7,14 @@ import { useShell } from "@/components/AppShell";
 interface Acc {
   id: string; name: string; type: string; colorToken: string; icon: string;
   identifierHint?: string | null; institution?: string | null; spent: number; count: number;
-  currentBalance?: number | null;
+  currentBalance?: number | null; statementDay?: number | null;
 }
 
 const MANUAL_TYPES = new Set(["INVESTMENT", "LOAN", "OTHER_ASSET"]);
 
 // Shared shape for both the "add new" and "edit existing" modal — same fields
 // either way, only the submit target (POST vs PATCH) differs.
-interface FormState { id?: string; name: string; type: string; institution: string; identifierHint: string; currentBalance: string }
+interface FormState { id?: string; name: string; type: string; institution: string; identifierHint: string; currentBalance: string; statementDay: string }
 
 export function AccountsClient({ accounts }: { accounts: Acc[] }) {
   const router = useRouter();
@@ -23,10 +23,10 @@ export function AccountsClient({ accounts }: { accounts: Acc[] }) {
   const [saving, setSaving] = useState(false);
 
   function openAdd() {
-    setForm({ name: "", type: "CREDIT_CARD", institution: "", identifierHint: "", currentBalance: "" });
+    setForm({ name: "", type: "CREDIT_CARD", institution: "", identifierHint: "", currentBalance: "", statementDay: "" });
   }
   function openEdit(a: Acc) {
-    setForm({ id: a.id, name: a.name, type: a.type, institution: a.institution ?? "", identifierHint: a.identifierHint ?? "", currentBalance: a.currentBalance != null ? String(a.currentBalance) : "" });
+    setForm({ id: a.id, name: a.name, type: a.type, institution: a.institution ?? "", identifierHint: a.identifierHint ?? "", currentBalance: a.currentBalance != null ? String(a.currentBalance) : "", statementDay: a.statementDay != null ? String(a.statementDay) : "" });
   }
 
   async function save() {
@@ -40,6 +40,7 @@ export function AccountsClient({ accounts }: { accounts: Acc[] }) {
         identifierHint: form.identifierHint || undefined,
         colorToken: "misc", icon,
         currentBalance: MANUAL_TYPES.has(form.type) ? Number(form.currentBalance || 0) : undefined,
+        statementDay: form.type === "CREDIT_CARD" ? (form.statementDay ? Number(form.statementDay) : (form.id ? null : undefined)) : undefined,
       };
       const res = form.id
         ? await fetch(`/api/accounts/${form.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
@@ -128,7 +129,16 @@ export function AccountsClient({ accounts }: { accounts: Acc[] }) {
                   Matches the sender domain in bank alert emails (e.g. alerts@<b>hdfcbank</b>.com) — helps auto-sort emailed transactions to the right account.
                 </div>
                 <input value={form.identifierHint} onChange={(e) => setForm({ ...form, identifierHint: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="Last 4 digits (optional, most accurate)"
-                  style={{ ...inputStyle, marginBottom: 16 }} />
+                  style={inputStyle} />
+              </>
+            )}
+            {form.type === "CREDIT_CARD" && (
+              <>
+                <input value={form.statementDay} onChange={(e) => setForm({ ...form, statementDay: e.target.value.replace(/\D/g, "").slice(0, 2) })} placeholder="Statement day (1-28, e.g. 5)"
+                  style={inputStyle} />
+                <div style={{ fontSize: 11.5, color: "var(--ink-subtle)", margin: "-6px 0 16px" }}>
+                  Day of the month your statement closes on — lets the Statements page group this card&apos;s ledger into actual billing cycles instead of calendar months.
+                </div>
               </>
             )}
             {MANUAL_TYPES.has(form.type) && (

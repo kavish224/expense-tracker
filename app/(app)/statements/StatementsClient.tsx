@@ -43,12 +43,28 @@ interface StatementTxn {
 }
 
 interface StatementData {
-  account: { id: string; name: string; type: string; institution: string | null; identifierHint: string | null; openingBalance: number };
+  account: { id: string; name: string; type: string; institution: string | null; identifierHint: string | null; openingBalance: number; statementDay: number | null };
   transactions: StatementTxn[];
 }
 
 const dayLabel = (iso: string) =>
   new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" });
+
+const fullDayLabel = (d: Date) => d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" });
+
+// Credit-card billing cycles run [statementDay+1 of month N-1 .. statementDay of month N],
+// closing on statementDay itself (capped at 28 to dodge short-month rollover).
+function cycleEndForDate(date: Date, statementDay: number): Date {
+  const monthOffset = date.getDate() <= statementDay ? 0 : 1;
+  return new Date(date.getFullYear(), date.getMonth() + monthOffset, statementDay, 23, 59, 59, 999);
+}
+function cycleKeyOf(end: Date): string {
+  return `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}`;
+}
+function cycleLabelOf(end: Date, statementDay: number): string {
+  const start = new Date(end.getFullYear(), end.getMonth() - 1, statementDay + 1);
+  return `${fullDayLabel(start)} – ${fullDayLabel(end)}`;
+}
 
 const TAG_COLORS = [
   { key: "amber", label: "Amber" },
@@ -197,6 +213,21 @@ function StatementGrid({
   });
 
   const storageKey = `statements-highlight:${accountId}`;
+  const statementDay = data?.account.statementDay ?? null;
+  const [selectedCycle, setSelectedCycle] = useState<string | null>(null);
+
+  const cycles = useMemo(() => {
+    if (!data || statementDay == null) return [];
+    const map = new Map<string, { key: string; label: string; end: Date }>();
+    for (const t of data.transactions) {
+      const end = cycleEndForDate(new Date(t.txnDatetime), statementDay);
+      const key = cycleKeyOf(end);
+      if (!map.has(key)) map.set(key, { key, label: cycleLabelOf(end, statementDay), end });
+    }
+    return [...map.values()].sort((a, b) => b.end.getTime() - a.end.getTime());
+  }, [data, statementDay]);
+
+  const effectiveCycle = cycles.find((c) => c.key === selectedCycle)?.key ?? cycles[0]?.key ?? null;
 
   const toggleHighlight = useCallback(
     (cellKey: string) => {
@@ -219,15 +250,19 @@ function StatementGrid({
 
   const filtered = useMemo(() => {
     if (!data) return [];
-    if (!q.trim()) return data.transactions;
+    let rows = data.transactions;
+    if (statementDay != null && effectiveCycle) {
+      rows = rows.filter((t) => cycleKeyOf(cycleEndForDate(new Date(t.txnDatetime), statementDay)) === effectiveCycle);
+    }
+    if (!q.trim()) return rows;
     const needle = q.trim().toLowerCase();
-    return data.transactions.filter(
+    return rows.filter(
       (t) =>
         t.merchantName?.toLowerCase().includes(needle) ||
         t.rawNarration?.toLowerCase().includes(needle) ||
         String(t.amount).includes(needle)
     );
-  }, [data, q]);
+  }, [data, q, statementDay, effectiveCycle]);
 
   const sorted = useMemo(() => {
     const rows = [...filtered];
@@ -373,12 +408,26 @@ function StatementGrid({
     );
   }
 
-  const latest = data.transactions[0];
+  const latest = filtered[0];
 
   return (
     <div>
       <div className="flex items-center gap-2 flex-wrap mb-3">
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search narration or amount…" className="max-w-xs" />
+        {statementDay != null && cycles.length > 0 && (
+          <Select value={effectiveCycle ?? undefined} onValueChange={setSelectedCycle}>
+            <SelectTrigger className="w-[210px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {cycles.map((c) => (
+                <SelectItem key={c.key} value={c.key}>
+                  {c.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <div className="flex items-center gap-1 ml-1">
           <span className="text-[12px] text-ink-subtle mr-1 hidden sm:inline">Highlight:</span>
           {HIGHLIGHT_COLORS.map((c) => (
@@ -402,7 +451,7 @@ function StatementGrid({
           )}
         </div>
         <div className="text-[13px] text-ink-muted ml-auto">
-          {data.transactions.length} entries
+          {filtered.length} entries
           {latest ? (
             <>
               {" "}· closing balance <strong className="text-ink">{formatINR(latest.runningBalance)}</strong>

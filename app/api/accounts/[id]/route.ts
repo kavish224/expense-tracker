@@ -17,6 +17,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if ("currentBalance" in body && typeof body.currentBalance === "number" && Number.isFinite(body.currentBalance)) {
     if (["INVESTMENT", "LOAN", "OTHER_ASSET"].includes(owned.type)) data.currentBalance = body.currentBalance;
   }
+  // Billing-cycle day for the Statements page — CREDIT_CARD only; null clears it.
+  if ("statementDay" in body && owned.type === "CREDIT_CARD") {
+    const v = body.statementDay;
+    data.statementDay = v === null ? null : (typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 28 ? v : owned.statementDay);
+  }
   const account = await prisma.account.update({ where: { id }, data });
   return NextResponse.json({ account: { ...account, openingBalance: Number(account.openingBalance), currentBalance: account.currentBalance == null ? null : Number(account.currentBalance) } });
 }

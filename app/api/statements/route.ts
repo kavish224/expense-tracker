@@ -58,6 +58,7 @@ export async function GET(req: NextRequest) {
       institution: account.institution,
       identifierHint: account.identifierHint,
       openingBalance: Number(account.openingBalance),
+      statementDay: account.statementDay,
     },
     transactions: withBalance.reverse(), // most recent first for display
   });

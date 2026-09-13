@@ -110,6 +110,10 @@ model Account {
   // Null for ledger accounts (BANK/CASH/CREDIT_CARD), whose balance is always
   // computed live from openingBalance + transactions.
   currentBalance Decimal?      @db.Decimal(14, 2)
+  // CREDIT_CARD only — day of month (1-28) the statement closes on, so the
+  // Statements page can group the ledger into actual billing cycles instead
+  // of calendar months. Null means the user hasn't configured it yet.
+  statementDay   Int?
   colorToken     String        @default("misc")
   icon           String        @default("card")
   isArchived     Boolean       @default(false)
